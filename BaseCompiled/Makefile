@@ -20,3 +20,4 @@ test: $(OBJ)
 
 clean:
 	rm -f test.o
+	rm test
