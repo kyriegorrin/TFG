@@ -1,0 +1,2 @@
+export OPENNI2_INCLUDE=/home/pi/Documents/TFG/OpenNI/OpenNI-Linux-Arm-2.2/Include
+export OPENNI2_REDIST=/home/pi/Documents/TFG/OpenNI/OpenNI-Linux-Arm-2.2/Redist
