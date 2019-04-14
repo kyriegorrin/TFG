@@ -1,6 +1,8 @@
 #include "OpenNI.h"
 #include <iostream>
 #include <fstream>
+#include <cstdint>
+#include <fstream>
 
 using namespace openni;
 
@@ -45,18 +47,38 @@ int main(){
 
 	//Mirem característiques del frame
 	int height, width, sizeInBytes, stride;
+	SensorType sensorType;
 
 	height = frame.getHeight();
 	width = frame.getWidth();
 	sizeInBytes = frame.getDataSize();
 	stride = frame.getStrideInBytes();
+	
+	sensorType = frame.getSensorType();
 
 	std::cout << "-------CARACTERÍSTIQUES DEL FRAME--------\n";
+	if(sensorType == SENSOR_IR) std::cout << "Tipus de sensor: Sensor IR\n";
+	else if(sensorType == SENSOR_COLOR) std::cout << "Tipus de sensor: Sensor de color\n";
+	else std::cout << "Tipus de sensor: Sensor de profunditat\n";
 	std::cout << "Altura: " << height << " pixels\n";
 	std::cout << "Amplada: " << width << " pixels\n";
 	std::cout << "Tamany del frame: " << sizeInBytes << " bytes\n";
 	std::cout << "Tamany del stride (fila): " << stride << " bytes\n";
+	std::cout << "Tamany de l'element: " << stride / width << " bytes\n";
 	std::cout << "------------------------------------------\n\n";
+
+	//Obtenim matriu d'elements i la guardem en un format CSV
+	//Les dades són de 2 bytes, si fos un altre s'ha dutilitzar el uintX_t equivalen
+	uint16_t* dades = (uint16_t*)frame.getData();
+	
+	std::ofstream file;
+	file.open("frame.csv");
+
+	for(int i = 0; i < height*width; ++i){
+		if((i % width) == (width-1)) file << dades[i] << "\n";
+		else file << dades[i] << ",";
+	}
+	file.close();
 
 	//......................SHUTDOWN...................//
 	//Tanquem dispositius i fem shutdown
