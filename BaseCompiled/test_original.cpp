@@ -62,7 +62,7 @@ int main(){
 	if(rc != STATUS_OK) std::cout << "No es pot fer la lectura del frame d'imatge\n\n" << OpenNI::getExtendedError();
 	else std::cout << "Frame d'imatge capturat\n\n";
 
-	//Mirem característiques dels frames i càmera
+	//Mirem característiques del frame i càmera
 	int height, width, sizeInBytes, stride;
 	SensorType sensorType;
 
@@ -73,8 +73,25 @@ int main(){
 	
 	sensorType = frame.getSensorType();
 
-	//PROFUNDITAT
 	std::cout << "-------CARACTERÍSTIQUES DEL FRAME DE PROFUNDITAT--------\n";
+	if(sensorType == SENSOR_IR) std::cout << "Tipus de sensor: Sensor IR\n";
+	else if(sensorType == SENSOR_COLOR) std::cout << "Tipus de sensor: Sensor de color\n";
+	else std::cout << "Tipus de sensor: Sensor de profunditat\n";
+	std::cout << "Altura: " << height << " pixels\n";
+	std::cout << "Amplada: " << width << " pixels\n";
+	std::cout << "Tamany del frame: " << sizeInBytes << " bytes\n";
+	std::cout << "Tamany del stride (fila): " << stride << " bytes\n";
+	std::cout << "Tamany de l'element: " << stride / width << " bytes\n";
+	std::cout << "--------------------------------------------------------\n\n";
+
+	height = frameImage.getHeight();
+	width = frameImage.getWidth();
+	sizeInBytes = frameImage.getDataSize();
+	stride = frameImage.getStrideInBytes();
+	
+	sensorType = frameImage.getSensorType();
+
+	std::cout << "-------CARACTERÍSTIQUES DEL FRAME D'IMATGE--------------\n";
 	if(sensorType == SENSOR_IR) std::cout << "Tipus de sensor: Sensor IR\n";
 	else if(sensorType == SENSOR_COLOR) std::cout << "Tipus de sensor: Sensor de color\n";
 	else std::cout << "Tipus de sensor: Sensor de profunditat\n";
@@ -97,26 +114,6 @@ int main(){
 		else file << dades[i] << ",";
 	}
 	file.close();
-
-	//IMATGE
-	height = frameImage.getHeight();
-	width = frameImage.getWidth();
-	sizeInBytes = frameImage.getDataSize();
-	stride = frameImage.getStrideInBytes();
-	
-	sensorType = frameImage.getSensorType();
-
-	std::cout << "-------CARACTERÍSTIQUES DEL FRAME D'IMATGE--------------\n";
-	if(sensorType == SENSOR_IR) std::cout << "Tipus de sensor: Sensor IR\n";
-	else if(sensorType == SENSOR_COLOR) std::cout << "Tipus de sensor: Sensor de color\n";
-	else std::cout << "Tipus de sensor: Sensor de profunditat\n";
-	std::cout << "Altura: " << height << " pixels\n";
-	std::cout << "Amplada: " << width << " pixels\n";
-	std::cout << "Tamany del frame: " << sizeInBytes << " bytes\n";
-	std::cout << "Tamany del stride (fila): " << stride << " bytes\n";
-	std::cout << "Tamany de l'element: " << stride / width << " bytes\n";
-	std::cout << "--------------------------------------------------------\n\n";
-
 
 	//......................SHUTDOWN...................//
 	//Tanquem dispositius i fem shutdown
