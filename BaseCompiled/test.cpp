@@ -19,7 +19,7 @@ void generateDepthCSV(uint16_t* dades, int height, int width){
 }
 
 //Funció per generar CSV de dades RGB a partir de matrius de dades.
-void generateImageCSV(char* dades, int height, int width){
+void generateImageCSV(uint8_t* dades, int height, int width){
 	std::ofstream file;
 	file.open("frameImage.csv");
 
@@ -28,6 +28,35 @@ void generateImageCSV(char* dades, int height, int width){
 		else file << dades[i] << ",";
 	}
 	file.close();
+}
+
+//Funció per imprimir per pantalla les característiques d'un frame
+void printFrameDetails(int height, int width, int sizeInBytes, int stride, 
+		PixelFormat* pixelFormat, SensorType* sensorType){
+	std::cout << "-------CARACTERÍSTIQUES DEL FRAME--------\n";
+	
+	if(*sensorType == SENSOR_IR) std::cout << "Tipus de sensor: Sensor IR\n";
+	else if(*sensorType == SENSOR_COLOR) std::cout << "Tipus de sensor: Sensor de color\n";
+	else std::cout << "Tipus de sensor: Sensor de profunditat\n";
+
+	std::cout << "Format de pixel: ";
+	if(*pixelFormat == 100) std::cout << "PIXEL_FORMAT_DEPTH_1_MM\n";
+	else if(*pixelFormat == 101) std::cout << "PIXEL_FORMAT_DEPTH_100_UM\n";
+	else if(*pixelFormat == 102) std::cout << "PIXEL_FORMAT_SHIFT_9_2\n";
+	else if(*pixelFormat == 103) std::cout << "PIXEL_FORMAT_SHIFT_9_3\n";
+	else if(*pixelFormat == 200) std::cout << "PIXEL_FORMAT_RGB888\n";
+	else if(*pixelFormat == 201) std::cout << "PIXEL_FORMAT_YUV422\n";
+	else if(*pixelFormat == 202) std::cout << "PIXEL_FORMAT_GRAY8\n";
+	else if(*pixelFormat == 203) std::cout << "PIXEL_FORMAT_GRAY16\n";
+	else if(*pixelFormat == 204) std::cout << "PIXEL_FORMAT_JPEG\n";
+	else if(*pixelFormat == 205) std::cout << "PIXEL_FORMAT_YUYV\n";
+
+	std::cout << "Altura: " << height << " pixels\n";
+	std::cout << "Amplada: " << width << " pixels\n";
+	std::cout << "Tamany del frame: " << sizeInBytes << " bytes\n";
+	std::cout << "Tamany del stride (fila): " << stride << " bytes\n";
+	std::cout << "Tamany de l'element: " << stride / width << " bytes\n";
+	std::cout << "------------------------------------------\n\n";
 }
 
 int main(){
@@ -85,29 +114,25 @@ int main(){
 	//Mirem característiques dels frames i càmera
 	int height, width, sizeInBytes, stride;
 	SensorType sensorType;
+	VideoMode videoMode; 
+	PixelFormat pixelFormat;
 
+	//PROFUNDITAT
 	height = frame.getHeight();
 	width = frame.getWidth();
 	sizeInBytes = frame.getDataSize();
 	stride = frame.getStrideInBytes();
 	sensorType = frame.getSensorType();
+	videoMode = depth.getVideoMode();
+	pixelFormat = videoMode.getPixelFormat();
 
-	//PROFUNDITAT
-	std::cout << "-------CARACTERÍSTIQUES DEL FRAME DE PROFUNDITAT--------\n";
-	if(sensorType == SENSOR_IR) std::cout << "Tipus de sensor: Sensor IR\n";
-	else if(sensorType == SENSOR_COLOR) std::cout << "Tipus de sensor: Sensor de color\n";
-	else std::cout << "Tipus de sensor: Sensor de profunditat\n";
-	std::cout << "Altura: " << height << " pixels\n";
-	std::cout << "Amplada: " << width << " pixels\n";
-	std::cout << "Tamany del frame: " << sizeInBytes << " bytes\n";
-	std::cout << "Tamany del stride (fila): " << stride << " bytes\n";
-	std::cout << "Tamany de l'element: " << stride / width << " bytes\n";
-	std::cout << "--------------------------------------------------------\n\n";
+	std::cout << "FRAME DE PROFUNDITAT\n";
+	printFrameDetails(height, width, sizeInBytes, stride, &pixelFormat, &sensorType);
 
 	//Obtenim matriu d'elements i la guardem en un format CSV
 	//Les dades són de 2 bytes, si fos un altre s'ha dutilitzar el uintX_t equivalen
-	uint16_t* dades = (uint16_t*)frame.getData();
-	generateDepthCSV(dades, height, width);
+	uint16_t* depthData = (uint16_t*)frame.getData();
+	generateDepthCSV(depthData, height, width);
 
 	//IMATGE
 	height = frameImage.getHeight();
@@ -115,18 +140,16 @@ int main(){
 	sizeInBytes = frameImage.getDataSize();
 	stride = frameImage.getStrideInBytes();
 	sensorType = frameImage.getSensorType();
+	videoMode = image.getVideoMode();
+	pixelFormat = videoMode.getPixelFormat();
 
-	std::cout << "-------CARACTERÍSTIQUES DEL FRAME D'IMATGE--------------\n";
-	if(sensorType == SENSOR_IR) std::cout << "Tipus de sensor: Sensor IR\n";
-	else if(sensorType == SENSOR_COLOR) std::cout << "Tipus de sensor: Sensor de color\n";
-	else std::cout << "Tipus de sensor: Sensor de profunditat\n";
-	std::cout << "Altura: " << height << " pixels\n";
-	std::cout << "Amplada: " << width << " pixels\n";
-	std::cout << "Tamany del frame: " << sizeInBytes << " bytes\n";
-	std::cout << "Tamany del stride (fila): " << stride << " bytes\n";
-	std::cout << "Tamany de l'element: " << stride / width << " bytes\n";
-	std::cout << "--------------------------------------------------------\n\n";
+	std::cout << "FRAME D'IMATGE\n";
+	printFrameDetails(height, width, sizeInBytes, stride, &pixelFormat, &sensorType);
 
+	//Obtenim matriu d'elements RGB i la guardem en CSV.
+	//Cada element Són 3 bytes (un per cada canal RGB).
+	uint8_t* imageData = (uint8_t*)frame.getData();
+	generateImageCSV(imageData, height, width);
 
 	//......................SHUTDOWN...................//
 	//Tanquem dispositius i fem shutdown
