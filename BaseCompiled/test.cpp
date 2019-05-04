@@ -6,11 +6,31 @@
 
 using namespace openni;
 
-int main(){
-	char buffer[320];
+//Funció per generar CSV de dades de profunditat a partir de matrius de dades.
+void generateDepthCSV(uint16_t* dades, int height, int width){
+	std::ofstream file;
+	file.open("frameDepth.csv");
 
-	for (int i = 0; i < 320; ++i) buffer[i] = '*';
-	
+	for(int i = 0; i < height*width; ++i){
+		if((i % width) == (width-1)) file << dades[i] << "\n";
+		else file << dades[i] << ",";
+	}
+	file.close();
+}
+
+//Funció per generar CSV de dades RGB a partir de matrius de dades.
+void generateImageCSV(char* dades, int height, int width){
+	std::ofstream file;
+	file.open("frameImage.csv");
+
+	for(int i = 0; i < height*width; ++i){
+		if((i % width) == (width-1)) file << dades[i] << "\n";
+		else file << dades[i] << ",";
+	}
+	file.close();
+}
+
+int main(){
 	//......................INICIALITZAR...................//
 	//Inicialitzem dispositiu
 	Status rc = OpenNI::initialize();
@@ -70,7 +90,6 @@ int main(){
 	width = frame.getWidth();
 	sizeInBytes = frame.getDataSize();
 	stride = frame.getStrideInBytes();
-	
 	sensorType = frame.getSensorType();
 
 	//PROFUNDITAT
@@ -88,22 +107,13 @@ int main(){
 	//Obtenim matriu d'elements i la guardem en un format CSV
 	//Les dades són de 2 bytes, si fos un altre s'ha dutilitzar el uintX_t equivalen
 	uint16_t* dades = (uint16_t*)frame.getData();
-	
-	std::ofstream file;
-	file.open("frame.csv");
-
-	for(int i = 0; i < height*width; ++i){
-		if((i % width) == (width-1)) file << dades[i] << "\n";
-		else file << dades[i] << ",";
-	}
-	file.close();
+	generateDepthCSV(dades, height, width);
 
 	//IMATGE
 	height = frameImage.getHeight();
 	width = frameImage.getWidth();
 	sizeInBytes = frameImage.getDataSize();
 	stride = frameImage.getStrideInBytes();
-	
 	sensorType = frameImage.getSensorType();
 
 	std::cout << "-------CARACTERÍSTIQUES DEL FRAME D'IMATGE--------------\n";
