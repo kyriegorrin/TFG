@@ -24,8 +24,8 @@ void generateImageCSV(uint8_t* dades, int height, int width){
 	file.open("frameImage.csv");
 
 	for(int i = 0; i < height*width; ++i){
-		if((i % width) == (width-1)) file << dades[i] << "\n";
-		else file << dades[i] << ",";
+		if((i % width) == (width-1)) file << unsigned(dades[i]) << "\n";
+		else file << unsigned(dades[i]) << ",";
 	}
 	file.close();
 }
