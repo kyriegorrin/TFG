@@ -19,6 +19,7 @@ void generateDepthCSV(uint16_t* dades, int height, int width){
 }
 
 //Funció per generar CSV de dades RGB a partir de matrius de dades.
+//Hi ha l'element R, G i B continus: R,G,B,R,G,B,...
 void generateImageCSV(uint8_t* dades, int height, int width){
 	std::ofstream file;
 	file.open("frameImage.csv");
@@ -28,6 +29,11 @@ void generateImageCSV(uint8_t* dades, int height, int width){
 		else file << unsigned(dades[i]) << ",";
 	}
 	file.close();
+}
+
+//Funció per generar imatge .ppm a partir de la matriu de dades RGB.
+void generateImagePPM(uint8_t* dades, int height, int width){
+	//TODO
 }
 
 //Funció per imprimir per pantalla les característiques d'un frame
