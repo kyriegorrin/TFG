@@ -3,6 +3,7 @@
 #include <fstream>
 #include <cstdint>
 #include <fstream>
+#include <bitset>
 
 using namespace openni;
 
@@ -24,8 +25,8 @@ void generateImageCSV(uint8_t* dades, int height, int width){
 	std::ofstream file;
 	file.open("frameImage.csv");
 
-	for(int i = 0; i < height*width; ++i){
-		if((i % width) == (width-1)) file << unsigned(dades[i]) << "\n";
+	for(int i = 0; i < height*width*3; ++i){
+		if((i % (width*3)) == (width-1)) file << unsigned(dades[i]) << "\n";
 		else file << unsigned(dades[i]) << ",";
 	}
 	file.close();
@@ -33,7 +34,18 @@ void generateImageCSV(uint8_t* dades, int height, int width){
 
 //Funció per generar imatge .ppm a partir de la matriu de dades RGB.
 void generateImagePPM(uint8_t* dades, int height, int width){
-	//TODO
+	std::ofstream file;
+	file.open("image.ppm", std::ios::out | std::ios::binary);
+	
+	//Afegim capçaleres
+	file << "P6 ";
+	file << width << " " << height << " ";
+	file << "255\n";
+
+	for(int i = 0; i < height*width*3; ++i){
+		file.write((char*)&dades[i], sizeof(char));
+	}
+	file.close();
 }
 
 //Funció per imprimir per pantalla les característiques d'un frame
@@ -152,10 +164,11 @@ int main(){
 	std::cout << "FRAME D'IMATGE\n";
 	printFrameDetails(height, width, sizeInBytes, stride, &pixelFormat, &sensorType);
 
-	//Obtenim matriu d'elements RGB i la guardem en CSV.
+	//Obtenim matriu d'elements RGB i la guardem en CSV i PPM.
 	//Cada element Són 3 bytes (un per cada canal RGB).
-	uint8_t* imageData = (uint8_t*)frame.getData();
+	uint8_t* imageData = (uint8_t*)frameImage.getData();
 	generateImageCSV(imageData, height, width);
+	generateImagePPM(imageData, height, width);
 
 	//......................SHUTDOWN...................//
 	//Tanquem dispositius i fem shutdown
