@@ -5,11 +5,31 @@
 #include <cstdint>
 #include <fstream>
 #include <bitset>
+#include <unistd.h>
 
 using namespace openni;
 
 int main(){
-	//......................INICIALITZAR...................//
+	
+	//---------------PROCESS/PIPE CREATION------------------//
+	int fd1[2], fd2[2], fd3[2];
+	int pid1, pid2, pid3;
+	
+	pid1=pid2=pid3=-1;
+	pid1 = fork();
+
+	//Idealment comprovaiem si les crides a sistema es fan correctament
+	if(pid1 == 0){
+		pid2 = fork();
+
+		if(pid2 == 0){
+			pid3 = fork();
+		}
+	}
+
+	
+
+	//..............OPENNI INITIALIZATION...................//
 	//Inicialitzem dispositiu
 	Status rc = OpenNI::initialize();
 	if(rc != STATUS_OK) std::cout << "Error d'inicialitzacio\n\n" << OpenNI::getExtendedError();
