@@ -100,9 +100,17 @@ int main(int argc, char *argv[]){
 
 //******************************* TASK 3 - COMPRESSING ********************************//
 
-	//OPCIONAL? Potser ficar opció per activar-ho o no,
-	//depenent de les condicions de bandwith	
+//OPCIONAL? Potser ficar opció per activar-ho o no,
+//depenent de les condicions de bandwith	
+	
+	//Inicialitzar minilzo
+	if(lzo_init() != LZO_E_OK){
+		std::cout << "Error inicialitzant minilzo" << endl;
+	}
+	
+	lzo_uint inLength, outLength, newLength;
 
+	//TODO: continua LZO compression a partir del testmini.c
 	
 //***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
 
