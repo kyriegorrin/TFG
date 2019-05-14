@@ -92,15 +92,17 @@ int main(int argc, char *argv[]){
 			
 	//Fem cropping en l'eix Z si s'ha especificat als arguments del programa
 	if(argc >= 3){
-		cropAxisZ(depthData, atoi(argv[2]), atoi(argv[3]), heightDepth, widthDepth);
+		cropAxisZ(depthData, atoi(argv[1]), atoi(argv[2]), heightDepth, widthDepth);
 	}
 	
-	//TODO: reducció de soroll
+	//TODO: reducció de soroll (convolució gaussiana?)
 
 //******************************* TASK 3 - COMPRESSING ********************************//
 
-	
+	//OPCIONAL? Potser ficar opció per activar-ho o no,
+	//depenent de les condicions de bandwith	
 
+	
 //***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
 
 	//......................SHUTDOWN...................//
