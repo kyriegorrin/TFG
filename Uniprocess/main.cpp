@@ -1,5 +1,6 @@
 #include "OpenNI.h"
 #include "utils.h"
+#include <stdlib.h>
 #include <iostream>
 #include <fstream>
 #include <cstdint>
@@ -9,26 +10,9 @@
 
 using namespace openni;
 
-int main(){
+int main(int argc, char *argv[]){
+//************************ TASK 1 - DATA RETRIEVAL**************************************//
 	
-	//---------------PROCESS/PIPE CREATION------------------//
-	int fd1[2], fd2[2], fd3[2];
-	int pid1, pid2, pid3;
-	
-	pid1=pid2=pid3=-1;
-	pid1 = fork();
-
-	//Idealment comprovaiem si les crides a sistema es fan correctament
-	if(pid1 == 0){
-		pid2 = fork();
-
-		if(pid2 == 0){
-			pid3 = fork();
-		}
-	}
-
-	
-
 	//..............OPENNI INITIALIZATION...................//
 	//Inicialitzem dispositiu
 	Status rc = OpenNI::initialize();
@@ -81,45 +65,43 @@ int main(){
 	else std::cout << "Frame d'imatge capturat\n\n";
 
 	//Mirem característiques dels frames i càmera
-	int height, width, sizeInBytes, stride;
-	SensorType sensorType;
-	VideoMode videoMode; 
-	PixelFormat pixelFormat;
+	int heightDepth, widthDepth, sizeInBytesDepth, strideDepth;
+	int heightImage, widthImage, sizeInBytesImage, strideImage;
 
 	//PROFUNDITAT
-	height = frame.getHeight();
-	width = frame.getWidth();
-	sizeInBytes = frame.getDataSize();
-	stride = frame.getStrideInBytes();
-	sensorType = frame.getSensorType();
-	videoMode = depth.getVideoMode();
-	pixelFormat = videoMode.getPixelFormat();
-
-	std::cout << "FRAME DE PROFUNDITAT\n";
-	printFrameDetails(height, width, sizeInBytes, stride, &pixelFormat, &sensorType);
+	heightDepth = frame.getHeight();
+	widthDepth = frame.getWidth();
+	sizeInBytesDepth = frame.getDataSize();
+	strideDepth = frame.getStrideInBytes();
 
 	//Obtenim matriu d'elements i la guardem en un format CSV
 	//Les dades són de 2 bytes, si fos un altre s'ha dutilitzar el uintX_t equivalen
 	uint16_t* depthData = (uint16_t*)frame.getData();
-	generateDepthCSV(depthData, height, width);
 
 	//IMATGE
-	height = frameImage.getHeight();
-	width = frameImage.getWidth();
-	sizeInBytes = frameImage.getDataSize();
-	stride = frameImage.getStrideInBytes();
-	sensorType = frameImage.getSensorType();
-	videoMode = image.getVideoMode();
-	pixelFormat = videoMode.getPixelFormat();
-
-	std::cout << "FRAME D'IMATGE\n";
-	printFrameDetails(height, width, sizeInBytes, stride, &pixelFormat, &sensorType);
+	heightImage = frameImage.getHeight();
+	widthImage = frameImage.getWidth();
+	sizeInBytesImage = frameImage.getDataSize();
+	strideImage = frameImage.getStrideInBytes();
 
 	//Obtenim matriu d'elements RGB i la guardem en CSV i PPM.
 	//Cada element Són 3 bytes (un per cada canal RGB).
 	uint8_t* imageData = (uint8_t*)frameImage.getData();
-	generateImageCSV(imageData, height, width);
-	generateImagePPM(imageData, height, width);
+
+//**************************** TASK 2 - DEPTH FRAME FILTERING *************************//
+			
+	//Fem cropping en l'eix Z si s'ha especificat als arguments del programa
+	if(argc >= 3){
+		cropAxisZ(depthData, atoi(argv[2]), atoi(argv[3]), heightDepth, widthDepth);
+	}
+	
+	//TODO: reducció de soroll
+
+//******************************* TASK 3 - COMPRESSING ********************************//
+
+	
+
+//***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
 
 	//......................SHUTDOWN...................//
 	//Tanquem dispositius i fem shutdown

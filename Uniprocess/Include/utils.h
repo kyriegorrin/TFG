@@ -7,6 +7,16 @@
 
 using namespace openni;
 
+//Funció per marcar els pixels que estan per sobre o per sota dels boundaries especificats
+//Input: mapa de profunditat en forma de vector, enters per marcar boundaries i especificacions
+//Els pixels que sobrepassen, passen a tenir valor -1. Eix Z.
+void cropAxisZ(uint16_t* data, int lowerBound, int upperBound, int height, int width){
+	for(int i = 0; i < height*width; ++i){
+		if(data[i] < lowerBound || data[i] > upperBound)
+			data[i] = -1;
+	}
+}
+
 //Funció per generar CSV de dades de profunditat a partir de matrius de dades.
 void generateDepthCSV(uint16_t* dades, int height, int width){
 	std::ofstream file;
