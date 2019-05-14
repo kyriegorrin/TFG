@@ -1,5 +1,6 @@
 #include "OpenNI.h"
 #include "utils.h"
+#include "minilzo.h"
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
