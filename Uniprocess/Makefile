@@ -6,12 +6,15 @@ IDIR=./Include
 LDIR=.
 LIBS=-lOpenNI2
 ODIR=.
-OBJ=main.o
+OBJ=main.o minilzo.o
 
 CFLAGS=-I$(IDIR) -L$(LDIR)
 
 %.o: %.cpp
-	$(CXX) -c -o $@ $< minilzo.c  $(CFLAGS)
+	$(CXX) -c -o $@ $< $(CFLAGS)
+
+%.o: %.c
+	$(CXX) -c -o $@ $< $(CFLAGS)
 
 main: $(OBJ)
 	$(CXX) -o $@ $^ $(CFLAGS) $(LIBS) -Wl,-rpath=./
@@ -19,5 +22,5 @@ main: $(OBJ)
 .PHONY: clean
 
 clean:
-	rm -f main.o
+	rm -f main.o minilzo.o
 	rm main
