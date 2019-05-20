@@ -18,9 +18,9 @@ void cropAxisZ(uint16_t* data, int lowerBound, int upperBound, int height, int w
 }
 
 //Funció per generar CSV de dades de profunditat a partir de matrius de dades.
-void generateDepthCSV(uint16_t* dades, int height, int width){
+void generateDepthCSV(const char* filename, uint16_t* dades, int height, int width){
 	std::ofstream file;
-	file.open("frameDepth.csv");
+	file.open(filename);
 
 	for(int i = 0; i < height*width; ++i){
 		if((i % width) == (width-1)) file << dades[i] << "\n";
@@ -31,9 +31,9 @@ void generateDepthCSV(uint16_t* dades, int height, int width){
 
 //Funció per generar CSV de dades RGB a partir de matrius de dades.
 //Hi ha l'element R, G i B continus: R,G,B,R,G,B,...
-void generateImageCSV(uint8_t* dades, int height, int width){
+void generateImageCSV(const char* filename, uint8_t* dades, int height, int width){
 	std::ofstream file;
-	file.open("frameImage.csv");
+	file.open(filename);
 
 	for(int i = 0; i < height*width*3; ++i){
 		if((i % (width*3)) == (width-1)) file << unsigned(dades[i]) << "\n";
