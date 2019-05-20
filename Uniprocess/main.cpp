@@ -11,6 +11,15 @@
 
 using namespace openni;
 
+//Vector temporal de sortida de lzo, ~1MB
+static unsigned char __LZO_MMODEL out [1000000];
+
+//Memòria de treball per a la compressió
+#define HEAP_ALLOC(var,size) \
+	lzo_align_t __LZO_MMODEL var [ ((size) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ]
+
+static HEAP_ALLOC(wrkmem, LZO1X_1_MEM_COMPRESS);
+
 int main(int argc, char *argv[]){
 //************************ TASK 1 - DATA RETRIEVAL**************************************//
 	
@@ -96,7 +105,8 @@ int main(int argc, char *argv[]){
 		cropAxisZ(depthData, atoi(argv[1]), atoi(argv[2]), heightDepth, widthDepth);
 	}
 	
-	//TODO: reducció de soroll (convolució gaussiana?)
+	//TODO: reducció de soroll (convolució gaussiana?) i potser tunejar
+	//com agafem paràmetres per la funció, molt guarro pel moment
 
 //******************************* TASK 3 - COMPRESSING ********************************//
 
@@ -105,15 +115,49 @@ int main(int argc, char *argv[]){
 	
 	//Inicialitzar minilzo
 	if(lzo_init() != LZO_E_OK){
-		std::cout << "Error inicialitzant minilzo" << endl;
+		std::cout << "Error inicialitzant minilzo\n\n";
 	}
 	
-	lzo_uint inLength, outLength, newLength;
+	std::cout << "Iniciant compressió amb LZO " << lzo_version_string() << "\n\n";
 
-	//TODO: continua LZO compression a partir del testmini.c
+	int r;
+	lzo_uint inLength, outLength, newLength;
 	
+	//Comprimir amb les dades obtingudes
+	inLength = sizeInBytesDepth;
+	r = lzo1x_1_compress((const unsigned char*) depthData, inLength, out, &outLength, wrkmem);
+	if (r == LZO_E_OK) 
+		std::cout << "Compressió de " << inLength << " bytes a " << outLength << " bytes\n\n";
+	else{
+		std::cout << "ERROR: compressió fallida\n\n";
+		return 2;
+	}
+	
+	/**TESTING AND DEBUG
+	//Descompressió de betamaletesting
+	newLength = inLength;
+	unsigned char* newDepth;
+	newDepth = (unsigned char*) malloc(inLength);
+
+	r = lzo1x_decompress(out, outLength, newDepth, &newLength, NULL);
+	if (r == LZO_E_OK) 
+		std::cout << "Descompressió de " << outLength << " bytes a " << newLength << " bytes\n\n";
+	else{
+		std::cout << "ERROR: descompressió fallida\n\n";
+		return 1;
+	}
+
+	//Generació de dos CSV per comprovar que no es perd dades
+	generateDepthCSV("frameDepthOriginal.csv", depthData, heightDepth, widthDepth);
+	generateDepthCSV("frameDepthDecomp.csv", (uint16_t *) newDepth, heightDepth, widthDepth);
+	
+	free(newDepth);	
+	*/
+
 //***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
 
+
+//*************************************************************************************//
 	//......................SHUTDOWN...................//
 	//Tanquem dispositius i fem shutdown
 	std::cout << "Fent release del frame de profunditat\n\n";
