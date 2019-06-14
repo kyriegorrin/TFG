@@ -133,7 +133,7 @@ int main(int argc, char *argv[]){
 		return 2;
 	}
 	
-	/**TESTING AND DEBUG
+	/**TESTING AND DEBUG->WORKS
 	//Descompressió de betamaletesting
 	newLength = inLength;
 	unsigned char* newDepth;
@@ -155,7 +155,7 @@ int main(int argc, char *argv[]){
 	*/
 
 //***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
-
+//TODO
 
 //*************************************************************************************//
 	//......................SHUTDOWN...................//
