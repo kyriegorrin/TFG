@@ -8,6 +8,15 @@
 #include <fstream>
 #include <bitset>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+
+//Server address and port to use for the socket
+#define SERVER_IP ""
+#define PORT 8080
+
+//Tamany del buffer a utilitzar per al socket
+#define SOCK_BUFF_SIZE 1000
 
 using namespace openni;
 
@@ -155,7 +164,42 @@ int main(int argc, char *argv[]){
 	*/
 
 //***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
-//TODO
+//TODO: socket deployment in process
+	
+	int socket_fd;
+	struct sockaddr_in serv_addr;
+	char *message = "Test message";
+	char buffer[1000] = {0};
+	
+	//Inicialitzem socket
+	socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+	if(socket_fd < 0){
+		std::cout << "Creació de socket fallida\n";
+		return -1;
+	}
+
+	//Configurem struct de serv_addr
+	serv_addr.sin_family = AF_INET;
+	serv_addr.sin_port = htons(PORT);
+
+	if(inet_pton(AF_INET, SERVER_IP, &serv_addr.sin_addr) <= 0){
+		std::cout << "Direcció IP destí no valida o no suportada\n";
+		return -2;
+	}
+
+	//Connexió amb el socket destí
+	if(connect(socket_fd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0){
+		std::cout << "Connexió fallida\n";
+		return -3;
+	}
+
+	//Enviament de dades (ara per ara es un test)
+	send(socket_fd, message, strlen(message), 0);
+	std::cout << "Missatge de prova enviat\n\n";
+	
+	//Test de recepció de missatges
+	//int bytes_read;
+	//bytes_read = read(socket_fd, buffer, SOCK_BUFF_SIZE);
 
 //*************************************************************************************//
 	//......................SHUTDOWN...................//
