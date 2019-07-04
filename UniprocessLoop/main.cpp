@@ -76,95 +76,6 @@ int main(int argc, char *argv[]){
 //-------------SETUP DEL SOCKET PER A TRANSMISSIO DE DADES------------//
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 
-
-
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
-//--------------INICI DE LOOP DE TRACTAMENT I TRANSMISSIO-------------//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
-
-	//Definició de variables d'ús per a tot el loop	
-	VideoFrameRef frame, frameImage;
-	int heightDepth, widthDepth, sizeInBytesDepth, strideDepth;
-	int heightImage, widthImage, sizeInBytesImage, strideImage;
-	
-	lzo_uint inLength, outLength, newLength;
-
-	//TODO: posar totes les variables que faltin
-
-	//Counter temporal per a que acabi el loop
-	int counter = 0;
-
-	//Comencem loop
-	while(counter < 100){
-		//......................TASK 1 - FRAME PROCESSING...................//
-		//Capturem un sol frame d'informació 3D i imatge
-	
-	}
-
-	rc = depth.readFrame(&frame);
-	if(rc != STATUS_OK) std::cout << "No es pot fer la lectura del frame de profunditat\n\n" << OpenNI::getExtendedError();
-	else std::cout << "Frame de profunditat capturat\n\n";
-
-	rc = image.readFrame(&frameImage);
-	if(rc != STATUS_OK) std::cout << "No es pot fer la lectura del frame d'imatge\n\n" << OpenNI::getExtendedError();
-	else std::cout << "Frame d'imatge capturat\n\n";
-
-	//PROFUNDITAT
-	heightDepth = frame.getHeight();
-	widthDepth = frame.getWidth();
-	sizeInBytesDepth = frame.getDataSize();
-	strideDepth = frame.getStrideInBytes();
-
-	//Obtenim matriu d'elements i la guardem en un format CSV
-	//Les dades són de 2 bytes, si fos un altre s'ha dutilitzar el uintX_t equivalen
-	uint16_t* depthData = (uint16_t*)frame.getData();
-
-	//IMATGE
-	heightImage = frameImage.getHeight();
-	widthImage = frameImage.getWidth();
-	sizeInBytesImage = frameImage.getDataSize();
-	strideImage = frameImage.getStrideInBytes();
-
-	//Obtenim matriu d'elements RGB i la guardem en CSV i PPM.
-	//Cada element Són 3 bytes (un per cada canal RGB).
-	uint8_t* imageData = (uint8_t*)frameImage.getData();
-
-	//**************************** TASK 2 - DEPTH FRAME FILTERING *************************//
-			
-	//Fem cropping en l'eix Z si s'ha especificat als arguments del programa
-	if(argc >= 3){
-		cropAxisZ(depthData, atoi(argv[1]), atoi(argv[2]), heightDepth, widthDepth);
-	}
-	
-	//TODO: reducció de soroll (convolució gaussiana?) i potser tunejar
-	//com agafem paràmetres per la funció, molt guarro pel moment
-
-	//******************************* TASK 3 - COMPRESSING ********************************//
-
-	//OPCIONAL? Potser ficar opció per activar-ho o no,
-	//depenent de les condicions de bandwith	
-	
-	//Inicialitzar minilzo
-	if(lzo_init() != LZO_E_OK){
-		std::cout << "Error inicialitzant minilzo\n\n";
-	}
-	
-	std::cout << "Iniciant compressió amb LZO " << lzo_version_string() << "\n\n";
-
-	int r;
-	
-	//Comprimir amb les dades obtingudes
-	inLength = sizeInBytesDepth;
-	r = lzo1x_1_compress((const unsigned char*) depthData, inLength, out, &outLength, wrkmem);
-	if (r == LZO_E_OK) 
-		std::cout << "Compressió de " << inLength << " bytes a " << outLength << " bytes\n\n";
-	else{
-		std::cout << "ERROR: compressió fallida\n\n";
-		return 2;
-	}
-
-	//***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
-	
 	int socket_fd;
 	struct sockaddr_in serv_addr;
 	char *message = "Test message";
@@ -192,9 +103,108 @@ int main(int argc, char *argv[]){
 		return -3;
 	}
 
-	//Enviament de dades (ara per ara es un test)
-	send(socket_fd, message, strlen(message), 0);
-	std::cout << "Missatge de prova enviat\n\n";
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//--------------INICI DE LOOP DE TRACTAMENT I TRANSMISSIO-------------//
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+
+	//Definició de variables d'ús per a tot el loop	
+	VideoFrameRef frame, frameImage;
+	int heightDepth, widthDepth, sizeInBytesDepth, strideDepth;
+	int heightImage, widthImage, sizeInBytesImage, strideImage;
+	
+	lzo_uint inLength, outLength, newLength;
+	uint16_t* depthData;
+	uint8_t* imageData;
+
+	int lzo_status;
+
+	int networkDepthSize;
+
+	//Counter temporal per a que acabi el loop
+	int counter = 0;
+
+	//Comencem loop
+	while(counter < 100){
+		//......................TASK 1 - FRAME PROCESSING...................//
+		//Capturem un sol frame d'informació 3D i imatge
+		rc = depth.readFrame(&frame);
+		if(rc != STATUS_OK) std::cout << "No es pot fer la lectura del frame de profunditat\n\n" << OpenNI::getExtendedError();
+		else std::cout << "Frame de profunditat capturat\n\n";
+
+		rc = image.readFrame(&frameImage);
+		if(rc != STATUS_OK) std::cout << "No es pot fer la lectura del frame d'imatge\n\n" << OpenNI::getExtendedError();
+		else std::cout << "Frame d'imatge capturat\n\n";
+
+		//PROFUNDITAT
+		heightDepth = frame.getHeight();
+		widthDepth = frame.getWidth();
+		sizeInBytesDepth = frame.getDataSize();
+		strideDepth = frame.getStrideInBytes();
+
+		//Obtenim matriu d'elements i la guardem en un format CSV
+		//Les dades són de 2 bytes, si fos un altre s'ha dutilitzar el uintX_t equivalen
+		depthData = (uint16_t*)frame.getData();
+
+		//IMATGE
+		heightImage = frameImage.getHeight();
+		widthImage = frameImage.getWidth();
+		sizeInBytesImage = frameImage.getDataSize();
+		strideImage = frameImage.getStrideInBytes();
+
+		//Obtenim matriu d'elements RGB i la guardem en CSV i PPM.
+		//Cada element Són 3 bytes (un per cada canal RGB).
+		imageData = (uint8_t*)frameImage.getData();
+
+		//**************************** TASK 2 - DEPTH FRAME FILTERING *************************//
+				
+		//Fem cropping en l'eix Z si s'ha especificat als arguments del programa
+		if(argc >= 3){
+			cropAxisZ(depthData, atoi(argv[1]), atoi(argv[2]), heightDepth, widthDepth);
+		}
+		
+		//TODO: reducció de soroll (convolució gaussiana?) i potser tunejar
+		//com agafem paràmetres per la funció, molt guarro pel moment
+
+		//******************************* TASK 3 - COMPRESSING ********************************//
+
+		//OPCIONAL? Potser ficar opció per activar-ho o no,
+		//depenent de les condicions de bandwith	
+		
+		//Inicialitzar minilzo
+		if(lzo_init() != LZO_E_OK){
+			std::cout << "Error inicialitzant minilzo\n\n";
+		}
+		
+		std::cout << "Iniciant compressió amb LZO " << lzo_version_string() << "\n\n";
+
+		//Comprimir amb les dades obtingudes
+		inLength = sizeInBytesDepth;
+		lzo_status = lzo1x_1_compress((const unsigned char*) depthData, inLength, out, &outLength, wrkmem);
+		if (lzo_status == LZO_E_OK) 
+			std::cout << "Compressió de " << inLength << " bytes a " << outLength << " bytes\n\n";
+		else{
+			std::cout << "ERROR: compressió fallida\n\n";
+			return 2;
+		}
+
+		//***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
+		
+		//Enviament de dades (ara per ara es un test)
+		//send(socket_fd, message, strlen(message), 0);
+		//std::cout << "Missatge de prova enviat\n\n";
+
+		//Enviament del tamany del frame en bytes
+		networkDepthSize = htonl(sizeInBytesDepth);
+		send(socket_fd, &networkDepthSize, sizeof(networkDepthSize), 0);
+
+		//Enviament del frame NO COMPRIMIT
+		send(socket_fd, (char *) depthData, sizeInBytesDepth, 0);
+		std::cout << "Frame " << counter << " enviat\n";
+
+		++counter;
+	
+	}
+
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //-----------------------SHUTDOWN DEL PROGRAMA------------------------//
