@@ -164,8 +164,8 @@ int main(int argc, char *argv[]){
 	*/
 
 //***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
-//TODO: socket deployment in process
-	
+//NOTE: uncomment to enable networking
+/*
 	int socket_fd;
 	struct sockaddr_in serv_addr;
 	char *message = "Test message";
@@ -200,7 +200,7 @@ int main(int argc, char *argv[]){
 	//Test de recepció de missatges
 	//int bytes_read;
 	//bytes_read = read(socket_fd, buffer, SOCK_BUFF_SIZE);
-
+*/
 //*************************************************************************************//
 	//......................SHUTDOWN...................//
 	//Tanquem dispositius i fem shutdown
