@@ -8,6 +8,7 @@
 #include <fstream>
 #include <bitset>
 #include <unistd.h>
+#include <errno.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
@@ -120,15 +121,18 @@ int main(int argc, char *argv[]){
 
 	int lzo_status;
 
+	int sentBytes= 0;
 	int networkDepthSize;
 
 	//Counter temporal per a que acabi el loop
 	int counter = 0;
 
 	//Comencem loop
-	while(counter < 1){
+	while(counter != 100){
 		//......................TASK 1 - FRAME PROCESSING...................//
 		//Capturem un sol frame d'informació 3D i imatge
+		std::cout << "--------------------------------------\n";
+
 		rc = depth.readFrame(&frame);
 		if(rc != STATUS_OK) std::cout << "No es pot fer la lectura del frame de profunditat\n\n" << OpenNI::getExtendedError();
 		else std::cout << "Frame de profunditat capturat\n\n";
@@ -191,21 +195,23 @@ int main(int argc, char *argv[]){
 
 		//***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
 		
-		//Enviament de dades (ara per ara es un test)
-		//send(socket_fd, message, strlen(message), 0);
-		//std::cout << "Missatge de prova enviat\n\n";
-
-		//Enviament del tamany del frame en bytes
+		//Enviament del tamany del frame en bytes, en network long
 		networkDepthSize = htonl(sizeInBytesDepth);
 		send(socket_fd, &networkDepthSize, sizeof(networkDepthSize), 0);
 
 		//Enviament del frame NO COMPRIMIT
-		send(socket_fd, (char *) depthData, sizeInBytesDepth, 0);
-		std::cout << "Frame " << counter << " enviat\n";
+		while(sentBytes < sizeInBytesDepth && sentBytes != -1){
+			sentBytes = send(socket_fd, (char *) depthData, sizeInBytesDepth, 0);
+			std::cout << "Enviats " << sentBytes << " bytes\n";
+		} 
 
+		if(sentBytes < 0) perror("Error enviant dades: ");
+		std::cout << "Frame " << counter << " enviat\n";
+		sentBytes = 0;
 		++counter;
 	
 	}
+	std::cout << "--------------------------------------\n\n";
 
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
