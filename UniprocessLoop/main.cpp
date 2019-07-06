@@ -103,6 +103,8 @@ int main(int argc, char *argv[]){
 		return -3;
 	}
 
+	std::cout << "Connexió a servidor satisfactoria\n\n";
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //--------------INICI DE LOOP DE TRACTAMENT I TRANSMISSIO-------------//
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
@@ -124,7 +126,7 @@ int main(int argc, char *argv[]){
 	int counter = 0;
 
 	//Comencem loop
-	while(counter < 100){
+	while(counter < 1){
 		//......................TASK 1 - FRAME PROCESSING...................//
 		//Capturem un sol frame d'informació 3D i imatge
 		rc = depth.readFrame(&frame);
