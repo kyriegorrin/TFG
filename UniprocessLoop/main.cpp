@@ -128,7 +128,7 @@ int main(int argc, char *argv[]){
 	int counter = 0;
 
 	//Comencem loop
-	while(counter != 100){
+	while(counter != 3000){
 		//......................TASK 1 - FRAME PROCESSING...................//
 		//Capturem un sol frame d'informació 3D i imatge
 		std::cout << "--------------------------------------\n";
