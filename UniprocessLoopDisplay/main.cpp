@@ -135,6 +135,9 @@ int main(int argc, char *argv[]){
 	send(socket_fd, &networkDepthX, sizeof(networkDepthX), 0);
 	send(socket_fd, &networkDepthY, sizeof(networkDepthY), 0);
 
+	std::cout << "Enviat tamany d'eix X: " << widthDepth << " elements\n";
+	std::cout << "Enviat tamany d'eix Y: " << heightDepth << " elements\n";
+
 	//Comencem loop
 	int counter = 0;
 	while(counter != 3000){
