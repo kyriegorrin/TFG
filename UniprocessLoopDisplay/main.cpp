@@ -13,7 +13,7 @@
 #include <arpa/inet.h>
 
 //Server address and port to use for the socket
-#define SERVER_IP "192.168.1.129"
+#define SERVER_IP "192.168.1.134"
 #define PORT 8080
 
 //Tamany del buffer a utilitzar per al socket
