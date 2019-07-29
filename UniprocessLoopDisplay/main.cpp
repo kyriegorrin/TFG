@@ -13,7 +13,8 @@
 #include <arpa/inet.h>
 
 //Server address and port to use for the socket
-#define SERVER_IP "192.168.1.134"
+#define SERVER_IP "192.168.1.134" //Server Armengod
+//#define SERVER_IP "147.83.179.2" //Server pis
 #define PORT 8080
 
 //Tamany del buffer a utilitzar per al socket
