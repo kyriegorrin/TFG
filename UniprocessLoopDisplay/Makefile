@@ -11,7 +11,7 @@ OBJ=main.o minilzo.o
 CFLAGS=-I$(IDIR) -L$(LDIR)
 
 %.o: %.cpp
-	$(CXX) -c -o $@ $< $(CFLAGS)
+	$(CXX) -c -O2 -o $@ $< $(CFLAGS)
 
 %.o: %.c
 	$(CXX) -c -o $@ $< $(CFLAGS)
