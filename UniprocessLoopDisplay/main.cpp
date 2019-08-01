@@ -30,6 +30,7 @@ using namespace openni;
 #define WINDOW_SIZE 49
 #define WINDOW_SIDE (int)sqrt((double)WINDOW_SIZE)
 #define WINDOW_SIDE_HALF WINDOW_SIDE/2 //Util per a offsets
+#define WALL_OFFSET (uint16_t) 5000 //Offset inicial de les "parets" de la matriu secundaria
 
 //Vector temporal de sortida de lzo, ~1MB
 static unsigned char __LZO_MMODEL out [1000000];
@@ -156,8 +157,13 @@ int main(int argc, char *argv[]){
 	widthDepth = frame.getWidth();
 	
 	//Creem matriu secundaria on guardar futurs filtratges i finestra de convolucio
-	uint16_t filteredDepthData [heightDepth][widthDepth] = {1000};
+	uint16_t filteredDepthData [heightDepth][widthDepth];
 	uint16_t window [WINDOW_SIZE];
+
+	//Inicialitzem el contingut de la matriu secundaria a un
+	//valor elevat per treure l'efecte "paret" dels grafics
+	for(int i = 0; i < heightDepth * widthDepth; ++i)
+		*((uint16_t*)filteredDepthData + i) = WALL_OFFSET;
 
 	//Enviem mesures del frame al servidor
 	networkDepthX = htonl(widthDepth);
@@ -238,7 +244,7 @@ int main(int argc, char *argv[]){
 				       filteredDepthData[i][j] = median;
 			       }
 			}
-			//TODO: tractar les posicions limit de la matriu. Ara mateix les deiem amb valor inical = 1000
+			//TODO: tractar les posicions limit de la matriu. Ara mateix les dexiem amb valor inical enorme.
 		
 		}
 
