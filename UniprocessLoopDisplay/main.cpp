@@ -27,7 +27,7 @@ using namespace openni;
 #define SOCK_BUFF_SIZE 1000
 
 //Tamany de la finestra per a filtratge (e.g. 3x3 = 9, 5x5 = 25, 7x7 = 49, etc)
-#define WINDOW_SIZE 25
+#define WINDOW_SIZE 49
 #define WINDOW_SIDE (int)sqrt((double)WINDOW_SIZE)
 #define WINDOW_SIDE_HALF WINDOW_SIDE/2 //Util per a offsets
 
@@ -254,9 +254,11 @@ int main(int argc, char *argv[]){
 		
 		std::cout << "Iniciant compressió amb LZO " << lzo_version_string() << "\n\n";
 
-		//Comprimir amb les dades obtingudes
+		//Comprimir amb les dades obtingudes, enviar versio filtrada si es fa servir
 		inLength = sizeInBytesDepth;
-		lzo_status = lzo1x_1_compress((const unsigned char*) filteredDepthData, inLength, out, &outLength, wrkmem);
+		if (WINDOW_SIZE != 1) lzo_status = lzo1x_1_compress((const unsigned char*) filteredDepthData, inLength, out, &outLength, wrkmem);
+		else lzo_status = lzo1x_1_compress((const unsigned char*) depthData, inLength, out, &outLength, wrkmem);
+		
 		if (lzo_status == LZO_E_OK) 
 			std::cout << "Compressió de " << inLength << " bytes a " << outLength << " bytes\n\n";
 		else{
@@ -272,7 +274,8 @@ int main(int argc, char *argv[]){
 
 		//Enviament del frame NO COMPRIMIT
 		while(sentBytes < sizeInBytesDepth && sentBytes != -1){
-			sentBytes = send(socket_fd, (char *) filteredDepthData, sizeInBytesDepth, 0);
+			if (WINDOW_SIZE != 1) sentBytes = send(socket_fd, (char *) filteredDepthData, sizeInBytesDepth, 0);
+			else sentBytes = send(socket_fd, (char *) depthData, sizeInBytesDepth, 0);
 			std::cout << "Enviats " << sentBytes << " bytes\n";
 		} 
 
