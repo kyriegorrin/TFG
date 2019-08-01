@@ -27,9 +27,9 @@ using namespace openni;
 #define SOCK_BUFF_SIZE 1000
 
 //Tamany de la finestra per a filtratge (e.g. 3x3 = 9, 5x5 = 25, 7x7 = 49, etc)
-#define WINDOW_SIZE 9
+#define WINDOW_SIZE 25
 #define WINDOW_SIDE (int)sqrt((double)WINDOW_SIZE)
-
+#define WINDOW_SIDE_HALF WINDOW_SIDE/2 //Util per a offsets
 
 //Vector temporal de sortida de lzo, ~1MB
 static unsigned char __LZO_MMODEL out [1000000];
@@ -214,20 +214,23 @@ int main(int argc, char *argv[]){
 		//NOTA: Canviar els offsets per a tamanys de finestra diferents a 3x3
 		//TODO: Passar-ho a algo mes generalista, aixo es massa hardcoded
 		if(WINDOW_SIZE != 1){
-			std::cout << "Iniciant filtratge per mediana amb tamany de finestra: " << WINDOW_SIZE << "\n\n";
+			std::cout << "Iniciant filtratge per mediana amb tamany de finestra: " << WINDOW_SIDE << "x" << WINDOW_SIDE << "\n\n";
 			uint16_t median;
-			for(int i = 1; i < heightDepth - 1; ++i){
-			       for(int j = 1; j < widthDepth -1; ++j){
+			for(int i = WINDOW_SIDE_HALF; i < heightDepth - WINDOW_SIDE_HALF; ++i){
+			       for(int j = WINDOW_SIDE_HALF; j < widthDepth - WINDOW_SIDE_HALF; ++j){
 				       //Update dels elements de la finestra
-				       window[0] = *(depthData + (widthDepth * (i - 1)) + j - 1);
-				       window[1] = *(depthData + (widthDepth * (i - 1)) + j);
-				       window[2] = *(depthData + (widthDepth * (i - 1)) + j + 1);
-				       window[3] = *(depthData + (widthDepth * i) + j - 1);
-				       window[4] = *(depthData + (widthDepth * i) + j);
-				       window[5] = *(depthData + (widthDepth * i) + j + 1);
-				       window[6] = *(depthData + (widthDepth * (i + 1)) + j - 1);
-				       window[7] = *(depthData + (widthDepth * (i + 1)) + j);
-				       window[8] = *(depthData + (widthDepth * (i + 1)) + j + 1);
+				       //window[0] = *(depthData + (widthDepth * (i - 1)) + j - 1);
+				       //window[1] = *(depthData + (widthDepth * (i - 1)) + j);
+				       //window[2] = *(depthData + (widthDepth * (i - 1)) + j + 1);
+				       //window[3] = *(depthData + (widthDepth * i) + j - 1);
+				       //window[4] = *(depthData + (widthDepth * i) + j);
+				       //window[5] = *(depthData + (widthDepth * i) + j + 1);
+				       //window[6] = *(depthData + (widthDepth * (i + 1)) + j - 1);
+				       //window[7] = *(depthData + (widthDepth * (i + 1)) + j);
+				       //window[8] = *(depthData + (widthDepth * (i + 1)) + j + 1);
+				       for(int k = 0; k < WINDOW_SIZE; ++k){
+							   window[k] = *(depthData + (widthDepth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
+				       } 
 
 				       //Sort dels valors de la finestra i seleccio de mediana
 				       insertSort(window);
@@ -235,7 +238,7 @@ int main(int argc, char *argv[]){
 				       filteredDepthData[i][j] = median;
 			       }
 			}
-			//TODO: tractar les posicions limit de la matriu (posant-les a 0 o copiant valors propers)
+			//TODO: tractar les posicions limit de la matriu. Ara mateix les deiem amb valor inical = 1000
 		
 		}
 
