@@ -19,21 +19,25 @@ using namespace openni;
 //-------------------GLOBAL VARIABLES AND STRUCTURES------------------//
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //Server address and port to use for the socket
-#define SERVER_IP "192.168.1.134" //Server Armengod
-//#define SERVER_IP "147.83.179.2" //Server pis
+//#define SERVER_IP "192.168.1.134" //Server desktop pis
+#define SERVER_IP "192.168.1.136" //Server portatil pis
+//#define SERVER_IP "147.83.179.2" //Server Armengod
 #define PORT 8080
 
 //Tamany del buffer a utilitzar per al socket
 #define SOCK_BUFF_SIZE 1000
 
 //Tamany de la finestra per a filtratge (e.g. 3x3 = 9, 5x5 = 25, 7x7 = 49, etc)
-#define WINDOW_SIZE 49
+#define WINDOW_SIZE 1
 #define WINDOW_SIDE (int)sqrt((double)WINDOW_SIZE)
 #define WINDOW_SIDE_HALF WINDOW_SIDE/2 //Util per a offsets
 #define WALL_OFFSET (uint16_t) 5000 //Offset inicial de les "parets" de la matriu secundaria
 
-//Vector temporal de sortida de lzo, ~1MB
-static unsigned char __LZO_MMODEL out [1000000];
+//Flag per determinar si utilitzem compressio o no
+#define COMPRESSION 1
+
+//Array temporal de sortida de lzo, ~1MB
+static unsigned char __LZO_MMODEL lzoArray [1000000];
 
 //Memòria de treball per a la compressió
 #define HEAP_ALLOC(var,size) \
@@ -142,7 +146,7 @@ int main(int argc, char *argv[]){
 	int heightDepth, widthDepth, sizeInBytesDepth, strideDepth;
 	int heightImage, widthImage, sizeInBytesImage, strideImage;
 	
-	lzo_uint inLength, outLength, newLength;
+	lzo_uint inLength, lzoOutLength;
 	uint16_t* depthData;
 	uint8_t* imageData;
 
@@ -249,37 +253,45 @@ int main(int argc, char *argv[]){
 		}
 
 		//******************************* TASK 3 - COMPRESSING ********************************//
+		//Comprimim les dades si el flag de compressio esta activat
+		if(COMPRESSION){
+			//Inicialitzar minilzo
+			if(lzo_init() != LZO_E_OK){
+				std::cout << "Error inicialitzant minilzo\n\n";
+			}
+			
+			std::cout << "Iniciant compressió amb LZO " << lzo_version_string() << "\n\n";
 
-		//OPCIONAL? Potser ficar opció per activar-ho o no,
-		//depenent de les condicions de bandwith	
-		
-		//Inicialitzar minilzo
-		if(lzo_init() != LZO_E_OK){
-			std::cout << "Error inicialitzant minilzo\n\n";
+			//Comprimir amb les dades obtingudes, enviar versio filtrada si es fa servir
+			inLength = sizeInBytesDepth;
+			if (WINDOW_SIZE != 1) lzo_status = lzo1x_1_compress((const unsigned char*) filteredDepthData, inLength, lzoArray, &lzoOutLength, wrkmem);
+			else lzo_status = lzo1x_1_compress((const unsigned char*) depthData, inLength, lzoArray, &lzoOutLength, wrkmem);
+			
+			if (lzo_status == LZO_E_OK) 
+				std::cout << "Compressió de " << inLength << " bytes a " << lzoOutLength << " bytes\n\n";
+			else{
+				std::cout << "ERROR: compressió fallida\n\n";
+				return 2;
+			}
 		}
-		
-		std::cout << "Iniciant compressió amb LZO " << lzo_version_string() << "\n\n";
 
-		//Comprimir amb les dades obtingudes, enviar versio filtrada si es fa servir
-		inLength = sizeInBytesDepth;
-		if (WINDOW_SIZE != 1) lzo_status = lzo1x_1_compress((const unsigned char*) filteredDepthData, inLength, out, &outLength, wrkmem);
-		else lzo_status = lzo1x_1_compress((const unsigned char*) depthData, inLength, out, &outLength, wrkmem);
-		
-		if (lzo_status == LZO_E_OK) 
-			std::cout << "Compressió de " << inLength << " bytes a " << outLength << " bytes\n\n";
-		else{
-			std::cout << "ERROR: compressió fallida\n\n";
-			return 2;
-		}
 
 		//***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
 		
 		//Enviament del tamany del frame en bytes, en network long
-		networkDepthSize = htonl(sizeInBytesDepth);
+		if(COMPRESSION) networkDepthSize = htonl(lzoOutLength);
+		else networkDepthSize = htonl(sizeInBytesDepth);
+
 		send(socket_fd, &networkDepthSize, sizeof(networkDepthSize), 0);
 
-		//Enviament del frame NO COMPRIMIT
-		while(sentBytes < sizeInBytesDepth && sentBytes != -1){
+		//Enviament del frame SI ESTA COMPRIMIT
+		while(sentBytes < lzoOutLength && sentBytes != -1 && COMPRESSION){
+			sentBytes = send(socket_fd, (char *) lzoArray, lzoOutLength, 0);
+			std::cout << "Enviats " << sentBytes << " bytes\n";
+		} 
+
+		//Enviament del frame SI NO ESTA COMPRIMIT
+		while(sentBytes < sizeInBytesDepth && sentBytes != -1 && !COMPRESSION){
 			if (WINDOW_SIZE != 1) sentBytes = send(socket_fd, (char *) filteredDepthData, sizeInBytesDepth, 0);
 			else sentBytes = send(socket_fd, (char *) depthData, sizeInBytesDepth, 0);
 			std::cout << "Enviats " << sentBytes << " bytes\n";
