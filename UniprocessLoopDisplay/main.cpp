@@ -221,8 +221,6 @@ int main(int argc, char *argv[]){
 		//}
 		
 		//Filtratge via mediana de finestra. Nomes aplica si el tamany de finestra no es trivial. 
-		//NOTA: Canviar els offsets per a tamanys de finestra diferents a 3x3
-		//TODO: Passar-ho a algo mes generalista, aixo es massa hardcoded
 		if(WINDOW_SIZE != 1){
 			std::cout << "Iniciant filtratge per mediana amb tamany de finestra: " << WINDOW_SIDE << "x" << WINDOW_SIDE << "\n\n";
 			uint16_t median;
@@ -248,8 +246,7 @@ int main(int argc, char *argv[]){
 				       filteredDepthData[i][j] = median;
 			       }
 			}
-			//TODO: tractar les posicions limit de la matriu. Ara mateix les dexiem amb valor inical enorme.
-		
+			//NOTE: no tractem les posicions limit de la matriu. Ara mateix les dexiem amb valor inical enorme.
 		}
 
 		//******************************* TASK 3 - COMPRESSING ********************************//
