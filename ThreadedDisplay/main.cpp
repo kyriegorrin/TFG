@@ -239,11 +239,42 @@ int main(int argc, char *argv[]){
 	std::cout << "Enviat tamany d'eix X: " << widthDepth << " elements\n";
 	std::cout << "Enviat tamany d'eix Y: " << heightDepth << " elements\n";
 
-	//Creem pools de threads i preparem els seus paràmetres
+	//Creem pools de threads i preparem els seus parametres
 	threadArgs threadArgs1, threadArgs2, threadArgs3;
 	pthread_t thread1, thread2, thread3;
 
 	//TODO: calculate thread parameters to pass and update threadArgs1,2,3 
+	//Cada thread processa una tercera part de la matriu (restem el offset de cada costat)
+	int heightChunkSize = (heightDepth - (WINDOW_SIDE_HALF*2))/3;
+	int heightChunkRemainder = (heightDepth - (WINDOW_SIDE_HALF*2))%3;
+
+	//Si la matriu no es divisible entre 3, ajustem carrega de cada thread
+	if(heightChunkRemainder == 1){
+		threadArgs1.firstRow = WINDOW_SIDE_HALF;
+		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
+		threadArgs2.firstRow = threadArgs1.lastRow + 1;
+		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
+		threadArgs3.firstRow = threadArgs2.lastRow + 1;
+		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+	} else if(heightChunkRemainder == 2){
+		threadArgs1.firstRow = WINDOW_SIDE_HALF;
+		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
+		threadArgs2.firstRow = threadArgs1.lastRow + 1;
+		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize + 1;	
+		threadArgs3.firstRow = threadArgs2.lastRow + 1;
+		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+	} else{
+		threadArgs1.firstRow = WINDOW_SIDE_HALF;
+		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize;	
+		threadArgs2.firstRow = threadArgs1.lastRow + 1;
+		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
+		threadArgs3.firstRow = threadArgs2.lastRow + 1;
+		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+	}
+
+	//L'amplada de la matriu es la mateixa per a tots els threads
+	threadArgs1.matrixWidth = threadArgs2.matrixWidth = threadArgs3.matrixWidth = widthDepth;
+
 	pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
 	pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
 	pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
