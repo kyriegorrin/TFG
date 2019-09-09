@@ -4,7 +4,7 @@ CPP=$(CXX)
 
 IDIR=./Include
 LDIR=.
-LIBS=-lOpenNI2
+LIBS=-lOpenNI2 -lpthread
 ODIR=.
 OBJ=main.o minilzo.o
 
