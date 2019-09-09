@@ -19,6 +19,7 @@ using namespace openni;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //-------------------GLOBAL VARIABLES AND STRUCTURES------------------//
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//NETWORKING VARIABLES
 //Server address and port to use for the socket
 //#define SERVER_IP "192.168.1.134" //Server desktop pis
 #define SERVER_IP "192.168.1.136" //Server portatil pis
@@ -28,12 +29,16 @@ using namespace openni;
 //Tamany del buffer a utilitzar per al socket
 #define SOCK_BUFF_SIZE 1000
 
+
+//FILTERING VARIABLES
 //Tamany de la finestra per a filtratge (e.g. 3x3 = 9, 5x5 = 25, 7x7 = 49, etc)
 #define WINDOW_SIZE 25
 #define WINDOW_SIDE (int)sqrt((double)WINDOW_SIZE)
 #define WINDOW_SIDE_HALF WINDOW_SIDE/2 //Util per a offsets
 #define WALL_OFFSET (uint16_t) 5000 //Offset inicial de les "parets" de la matriu secundaria
 
+
+//COMPRESSION STRUCTURES AND VARIABLES
 //Flag per determinar si utilitzem compressio o no
 #define COMPRESSION 1
 
@@ -45,6 +50,61 @@ static unsigned char __LZO_MMODEL lzoArray [1000000];
 	lzo_align_t __LZO_MMODEL var [ ((size) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ]
 
 static HEAP_ALLOC(wrkmem, LZO1X_1_MEM_COMPRESS);
+
+
+//MULTITHREAD STRUCTURES AND VARIABLES//
+//Flags a utilitzar per a sincronitzar threads
+int thread1Start, thread2Start, thread3Start;
+thread1Start = 0;
+thread2Start = 0;
+thread3Start = 0;
+
+//Estructura de dades a utilitzar com a parametre per als threads
+struct threadArgs {
+	int firstRow;
+	int lastRow;
+	int matrixWidth;
+};
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//-----------------------WORKER THREADS FUNCTION----------------------//
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//Function to do a median windowed filtering of a subset of data (matrix).
+//threadData contains the width of the matrix and the initial and end row to process.
+void *medianFilterWorker(void *threadData){
+	//Global variables to use, defined at main
+	uint16_t *filteredDepthData;
+	uint16_t *window;
+
+	int firstRow = (threadArgs*)threadData->firstRow;
+	int lastRow = (threadArgs*)threadData->lastRow;
+	int matrixWidth = (threadArgs*)threadData->matrixWidth;
+
+	uint16_t median;
+	//TODO: adapt this code so it uses the given arguments
+	for(int i = WINDOW_SIDE_HALF; i < heightDepth - WINDOW_SIDE_HALF; ++i){
+	       for(int j = WINDOW_SIDE_HALF; j < widthDepth - WINDOW_SIDE_HALF; ++j){
+		       //Update dels elements de la finestra
+		       //window[0] = *(depthData + (widthDepth * (i - 1)) + j - 1);
+		       //window[1] = *(depthData + (widthDepth * (i - 1)) + j);
+		       //window[2] = *(depthData + (widthDepth * (i - 1)) + j + 1);
+		       //window[3] = *(depthData + (widthDepth * i) + j - 1);
+		       //window[4] = *(depthData + (widthDepth * i) + j);
+		       //window[5] = *(depthData + (widthDepth * i) + j + 1);
+		       //window[6] = *(depthData + (widthDepth * (i + 1)) + j - 1);
+		       //window[7] = *(depthData + (widthDepth * (i + 1)) + j);
+		       //window[8] = *(depthData + (widthDepth * (i + 1)) + j + 1);
+		       for(int k = 0; k < WINDOW_SIZE; ++k){
+					   window[k] = *(depthData + (widthDepth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
+		       } 
+		 	//Sort dels valors de la finestra i seleccio de mediana
+		       insertSort(window);
+		       median = window[WINDOW_SIZE / 2];
+		       filteredDepthData[i][j] = median;
+	       }
+	}
+	//NOTE: no tractem les posicions limit de la matriu. Ara mateix les dexiem amb valor inical enorme.
+}
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //-------------------AUXILIARY AND HELPER FUNCTIONS-------------------//
@@ -179,6 +239,15 @@ int main(int argc, char *argv[]){
 	std::cout << "Enviat tamany d'eix X: " << widthDepth << " elements\n";
 	std::cout << "Enviat tamany d'eix Y: " << heightDepth << " elements\n";
 
+	//Creem pools de threads i preparem els seus paràmetres
+	threadArgs threadArgs1, threadArgs2, threadArgs3;
+	pthread_t thread1, thread2, thread3;
+
+	//TODO: calculate thread parameters to pass and update threadArgs1,2,3 
+	pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
+	pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
+	pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
+
 	//Comencem loop
 	int counter = 0;
 	while(counter != 3000){
@@ -224,30 +293,7 @@ int main(int argc, char *argv[]){
 		//Filtratge via mediana de finestra. Nomes aplica si el tamany de finestra no es trivial. 
 		if(WINDOW_SIZE != 1){
 			std::cout << "Iniciant filtratge per mediana amb tamany de finestra: " << WINDOW_SIDE << "x" << WINDOW_SIDE << "\n\n";
-			uint16_t median;
-			for(int i = WINDOW_SIDE_HALF; i < heightDepth - WINDOW_SIDE_HALF; ++i){
-			       for(int j = WINDOW_SIDE_HALF; j < widthDepth - WINDOW_SIDE_HALF; ++j){
-				       //Update dels elements de la finestra
-				       //window[0] = *(depthData + (widthDepth * (i - 1)) + j - 1);
-				       //window[1] = *(depthData + (widthDepth * (i - 1)) + j);
-				       //window[2] = *(depthData + (widthDepth * (i - 1)) + j + 1);
-				       //window[3] = *(depthData + (widthDepth * i) + j - 1);
-				       //window[4] = *(depthData + (widthDepth * i) + j);
-				       //window[5] = *(depthData + (widthDepth * i) + j + 1);
-				       //window[6] = *(depthData + (widthDepth * (i + 1)) + j - 1);
-				       //window[7] = *(depthData + (widthDepth * (i + 1)) + j);
-				       //window[8] = *(depthData + (widthDepth * (i + 1)) + j + 1);
-				       for(int k = 0; k < WINDOW_SIZE; ++k){
-							   window[k] = *(depthData + (widthDepth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
-				       } 
-
-				       //Sort dels valors de la finestra i seleccio de mediana
-				       insertSort(window);
-				       median = window[WINDOW_SIZE / 2];
-				       filteredDepthData[i][j] = median;
-			       }
-			}
-			//NOTE: no tractem les posicions limit de la matriu. Ara mateix les dexiem amb valor inical enorme.
+			//TODO: afegeix logica de sincronitzacio de threads
 		}
 
 		//******************************* TASK 3 - COMPRESSING ********************************//
