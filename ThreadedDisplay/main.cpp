@@ -2,6 +2,7 @@
 #include "utils.h"
 #include "minilzo.h"
 #include <stdlib.h>
+#include <math.h>
 #include <iostream>
 #include <fstream>
 #include <cstdint>
@@ -11,24 +12,55 @@
 #include <errno.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
+using namespace openni;
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//-------------------GLOBAL VARIABLES AND STRUCTURES------------------//
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //Server address and port to use for the socket
-#define SERVER_IP "192.168.1.3"
+//#define SERVER_IP "192.168.1.134" //Server desktop pis
+#define SERVER_IP "192.168.1.136" //Server portatil pis
+//#define SERVER_IP "147.83.179.2" //Server Armengod
 #define PORT 8080
 
 //Tamany del buffer a utilitzar per al socket
 #define SOCK_BUFF_SIZE 1000
 
-using namespace openni;
+//Tamany de la finestra per a filtratge (e.g. 3x3 = 9, 5x5 = 25, 7x7 = 49, etc)
+#define WINDOW_SIZE 25
+#define WINDOW_SIDE (int)sqrt((double)WINDOW_SIZE)
+#define WINDOW_SIDE_HALF WINDOW_SIDE/2 //Util per a offsets
+#define WALL_OFFSET (uint16_t) 5000 //Offset inicial de les "parets" de la matriu secundaria
 
-//Vector temporal de sortida de lzo, ~1MB
-static unsigned char __LZO_MMODEL out [1000000];
+//Flag per determinar si utilitzem compressio o no
+#define COMPRESSION 1
+
+//Array temporal de sortida de lzo, ~1MB
+static unsigned char __LZO_MMODEL lzoArray [1000000];
 
 //Memòria de treball per a la compressió
 #define HEAP_ALLOC(var,size) \
 	lzo_align_t __LZO_MMODEL var [ ((size) + (sizeof(lzo_align_t) - 1)) / sizeof(lzo_align_t) ]
 
 static HEAP_ALLOC(wrkmem, LZO1X_1_MEM_COMPRESS);
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//-------------------AUXILIARY AND HELPER FUNCTIONS-------------------//
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//Function to sort a given window (array). Used for median filtering.
+void insertSort(uint16_t window[]){
+	uint16_t aux;
+	int i, j;
+	for(i = 0; i < WINDOW_SIZE; ++i){
+		aux = window[i];
+		for(j = i -1; j >= 0 && aux < window[j]; --j){
+			window[j+1] = window[j];
+		}
+		window[j+1] = aux;
+	}
+}
 
 int main(int argc, char *argv[]){
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
@@ -110,12 +142,12 @@ int main(int argc, char *argv[]){
 //--------------INICI DE LOOP DE TRACTAMENT I TRANSMISSIO-------------//
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 
-	//Definició de variables d'ús per a tot el loop	
+	//Definició de variables i estructures d'ús per a tot el loop	
 	VideoFrameRef frame, frameImage;
 	int heightDepth, widthDepth, sizeInBytesDepth, strideDepth;
 	int heightImage, widthImage, sizeInBytesImage, strideImage;
 	
-	lzo_uint inLength, outLength, newLength;
+	lzo_uint inLength, lzoOutLength;
 	uint16_t* depthData;
 	uint8_t* imageData;
 
@@ -129,6 +161,15 @@ int main(int argc, char *argv[]){
 	heightDepth = frame.getHeight();
 	widthDepth = frame.getWidth();
 	
+	//Creem matriu secundaria on guardar futurs filtratges i finestra de convolucio
+	uint16_t filteredDepthData [heightDepth][widthDepth];
+	uint16_t window [WINDOW_SIZE];
+
+	//Inicialitzem el contingut de la matriu secundaria a un
+	//valor elevat per treure l'efecte "paret" dels grafics
+	for(int i = 0; i < heightDepth * widthDepth; ++i)
+		*((uint16_t*)filteredDepthData + i) = WALL_OFFSET;
+
 	//Enviem mesures del frame al servidor
 	networkDepthX = htonl(widthDepth);
 	networkDepthY = htonl(heightDepth);
@@ -176,44 +217,81 @@ int main(int argc, char *argv[]){
 		//**************************** TASK 2 - DEPTH FRAME FILTERING *************************//
 				
 		//Fem cropping en l'eix Z si s'ha especificat als arguments del programa
-		if(argc >= 3){
-			cropAxisZ(depthData, atoi(argv[1]), atoi(argv[2]), heightDepth, widthDepth);
-		}
+		//if(argc >= 3){
+		//	cropAxisZ(depthData, atoi(argv[1]), atoi(argv[2]), heightDepth, widthDepth);
+		//}
 		
-		//TODO: reducció de soroll (convolució gaussiana?) i potser tunejar
-		//com agafem paràmetres per la funció, molt guarro pel moment
+		//Filtratge via mediana de finestra. Nomes aplica si el tamany de finestra no es trivial. 
+		if(WINDOW_SIZE != 1){
+			std::cout << "Iniciant filtratge per mediana amb tamany de finestra: " << WINDOW_SIDE << "x" << WINDOW_SIDE << "\n\n";
+			uint16_t median;
+			for(int i = WINDOW_SIDE_HALF; i < heightDepth - WINDOW_SIDE_HALF; ++i){
+			       for(int j = WINDOW_SIDE_HALF; j < widthDepth - WINDOW_SIDE_HALF; ++j){
+				       //Update dels elements de la finestra
+				       //window[0] = *(depthData + (widthDepth * (i - 1)) + j - 1);
+				       //window[1] = *(depthData + (widthDepth * (i - 1)) + j);
+				       //window[2] = *(depthData + (widthDepth * (i - 1)) + j + 1);
+				       //window[3] = *(depthData + (widthDepth * i) + j - 1);
+				       //window[4] = *(depthData + (widthDepth * i) + j);
+				       //window[5] = *(depthData + (widthDepth * i) + j + 1);
+				       //window[6] = *(depthData + (widthDepth * (i + 1)) + j - 1);
+				       //window[7] = *(depthData + (widthDepth * (i + 1)) + j);
+				       //window[8] = *(depthData + (widthDepth * (i + 1)) + j + 1);
+				       for(int k = 0; k < WINDOW_SIZE; ++k){
+							   window[k] = *(depthData + (widthDepth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
+				       } 
+
+				       //Sort dels valors de la finestra i seleccio de mediana
+				       insertSort(window);
+				       median = window[WINDOW_SIZE / 2];
+				       filteredDepthData[i][j] = median;
+			       }
+			}
+			//NOTE: no tractem les posicions limit de la matriu. Ara mateix les dexiem amb valor inical enorme.
+		}
 
 		//******************************* TASK 3 - COMPRESSING ********************************//
+		//Comprimim les dades si el flag de compressio esta activat
+		if(COMPRESSION){
+			//Inicialitzar minilzo
+			if(lzo_init() != LZO_E_OK){
+				std::cout << "Error inicialitzant minilzo\n\n";
+			}
+			
+			std::cout << "Iniciant compressió amb LZO " << lzo_version_string() << "\n\n";
 
-		//OPCIONAL? Potser ficar opció per activar-ho o no,
-		//depenent de les condicions de bandwith	
-		
-		//Inicialitzar minilzo
-		if(lzo_init() != LZO_E_OK){
-			std::cout << "Error inicialitzant minilzo\n\n";
+			//Comprimir amb les dades obtingudes, enviar versio filtrada si es fa servir
+			inLength = sizeInBytesDepth;
+			if (WINDOW_SIZE != 1) lzo_status = lzo1x_1_compress((const unsigned char*) filteredDepthData, inLength, lzoArray, &lzoOutLength, wrkmem);
+			else lzo_status = lzo1x_1_compress((const unsigned char*) depthData, inLength, lzoArray, &lzoOutLength, wrkmem);
+			
+			if (lzo_status == LZO_E_OK) 
+				std::cout << "Compressió de " << inLength << " bytes a " << lzoOutLength << " bytes\n\n";
+			else{
+				std::cout << "ERROR: compressió fallida\n\n";
+				return 2;
+			}
 		}
-		
-		std::cout << "Iniciant compressió amb LZO " << lzo_version_string() << "\n\n";
 
-		//Comprimir amb les dades obtingudes
-		inLength = sizeInBytesDepth;
-		lzo_status = lzo1x_1_compress((const unsigned char*) depthData, inLength, out, &outLength, wrkmem);
-		if (lzo_status == LZO_E_OK) 
-			std::cout << "Compressió de " << inLength << " bytes a " << outLength << " bytes\n\n";
-		else{
-			std::cout << "ERROR: compressió fallida\n\n";
-			return 2;
-		}
 
 		//***********************TASK 4 - SENDING AND SOCKET MANAGEMENT************************//
 		
 		//Enviament del tamany del frame en bytes, en network long
-		networkDepthSize = htonl(sizeInBytesDepth);
+		if(COMPRESSION) networkDepthSize = htonl(lzoOutLength);
+		else networkDepthSize = htonl(sizeInBytesDepth);
+
 		send(socket_fd, &networkDepthSize, sizeof(networkDepthSize), 0);
 
-		//Enviament del frame NO COMPRIMIT
-		while(sentBytes < sizeInBytesDepth && sentBytes != -1){
-			sentBytes = send(socket_fd, (char *) depthData, sizeInBytesDepth, 0);
+		//Enviament del frame SI ESTA COMPRIMIT
+		while(sentBytes < lzoOutLength && sentBytes != -1 && COMPRESSION){
+			sentBytes = send(socket_fd, (char *) lzoArray, lzoOutLength, 0);
+			std::cout << "Enviats " << sentBytes << " bytes\n";
+		} 
+
+		//Enviament del frame SI NO ESTA COMPRIMIT
+		while(sentBytes < sizeInBytesDepth && sentBytes != -1 && !COMPRESSION){
+			if (WINDOW_SIZE != 1) sentBytes = send(socket_fd, (char *) filteredDepthData, sizeInBytesDepth, 0);
+			else sentBytes = send(socket_fd, (char *) depthData, sizeInBytesDepth, 0);
 			std::cout << "Enviats " << sentBytes << " bytes\n";
 		} 
 
