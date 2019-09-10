@@ -32,7 +32,7 @@ using namespace openni;
 
 //FILTERING VARIABLES
 //Tamany de la finestra per a filtratge (e.g. 3x3 = 9, 5x5 = 25, 7x7 = 49, etc)
-#define WINDOW_SIZE 25
+#define WINDOW_SIZE 49
 #define WINDOW_SIDE (int)sqrt((double)WINDOW_SIZE)
 #define WINDOW_SIDE_HALF WINDOW_SIDE/2 //Util per a offsets
 #define WALL_OFFSET (uint16_t) 5000 //Offset inicial de les "parets" de la matriu secundaria
@@ -54,13 +54,13 @@ static HEAP_ALLOC(wrkmem, LZO1X_1_MEM_COMPRESS);
 
 //MULTITHREAD STRUCTURES AND VARIABLES//
 //Flags a utilitzar per a sincronitzar threads
-int thread1Start, thread2Start, thread3Start;
-thread1Start = 0;
-thread2Start = 0;
-thread3Start = 0;
+int thread1Start = 0;
+int thread2Start = 0;
+int thread3Start = 0;
 
 //Estructura de dades a utilitzar com a parametre per als threads
 struct threadArgs {
+	int threadID;
 	int firstRow;
 	int lastRow;
 	int matrixWidth;
@@ -73,37 +73,50 @@ struct threadArgs {
 //threadData contains the width of the matrix and the initial and end row to process.
 void *medianFilterWorker(void *threadData){
 	//Global variables to use, defined at main
+	uint16_t *depthData;
 	uint16_t *filteredDepthData;
-	uint16_t *window;
 
-	int firstRow = (threadArgs*)threadData->firstRow;
-	int lastRow = (threadArgs*)threadData->lastRow;
-	int matrixWidth = (threadArgs*)threadData->matrixWidth;
+	int firstRow = ((threadArgs*)threadData)->firstRow;
+	int lastRow = ((threadArgs*)threadData)->lastRow;
+	int matrixWidth = ((threadArgs*)threadData)->matrixWidth;
 
 	uint16_t median;
-	//TODO: adapt this code so it uses the given arguments
-	for(int i = WINDOW_SIDE_HALF; i < heightDepth - WINDOW_SIDE_HALF; ++i){
-	       for(int j = WINDOW_SIDE_HALF; j < widthDepth - WINDOW_SIDE_HALF; ++j){
-		       //Update dels elements de la finestra
-		       //window[0] = *(depthData + (widthDepth * (i - 1)) + j - 1);
-		       //window[1] = *(depthData + (widthDepth * (i - 1)) + j);
-		       //window[2] = *(depthData + (widthDepth * (i - 1)) + j + 1);
-		       //window[3] = *(depthData + (widthDepth * i) + j - 1);
-		       //window[4] = *(depthData + (widthDepth * i) + j);
-		       //window[5] = *(depthData + (widthDepth * i) + j + 1);
-		       //window[6] = *(depthData + (widthDepth * (i + 1)) + j - 1);
-		       //window[7] = *(depthData + (widthDepth * (i + 1)) + j);
-		       //window[8] = *(depthData + (widthDepth * (i + 1)) + j + 1);
-		       for(int k = 0; k < WINDOW_SIZE; ++k){
-					   window[k] = *(depthData + (widthDepth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
-		       } 
-		 	//Sort dels valors de la finestra i seleccio de mediana
-		       insertSort(window);
-		       median = window[WINDOW_SIZE / 2];
-		       filteredDepthData[i][j] = median;
-	       }
+	uint16_t window[WINDOW_SIZE];
+
+	//Depenent del thread on som, mirem un flag o un altre
+	int *threadStart;
+	switch(((threadArgs*)threadData)->threadID){
+		case 1:
+			threadStart = &thread1Start;
+			break;
+		case 2:
+			threadStart = &thread2Start;
+			break;
+		case 3:
+			threadStart = &thread3Start;
+			break;
+		//No hauria de passar
+		default:
+			threadStart = &thread1Start;
 	}
-	//NOTE: no tractem les posicions limit de la matriu. Ara mateix les dexiem amb valor inical enorme.
+
+	//El thread sempre esta a la espera de que es notifiqui que pot començar
+	while(*threadStart){
+		for(int i = firstRow; i <= lastRow; ++i){
+		       for(int j = WINDOW_SIDE_HALF; j < matrixWidth - WINDOW_SIDE_HALF; ++j){
+			       //Update dels elements de la finestra
+			       for(int k = 0; k < WINDOW_SIZE; ++k){
+						   window[k] = *(depthData + (matrixWidth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
+			       } 
+			 	//Sort dels valors de la finestra i seleccio de mediana
+			       insertSort(window);
+			       median = window[WINDOW_SIZE / 2];
+			       *(filteredDepthData + j + (i * matrixWidth)) = median;
+		       }
+		}
+		//Notifiquem que hem acabat, evitem tornar a entrar al bucle
+		*threadStart = 0;
+	}
 }
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
@@ -223,7 +236,6 @@ int main(int argc, char *argv[]){
 	
 	//Creem matriu secundaria on guardar futurs filtratges i finestra de convolucio
 	uint16_t filteredDepthData [heightDepth][widthDepth];
-	uint16_t window [WINDOW_SIZE];
 
 	//Inicialitzem el contingut de la matriu secundaria a un
 	//valor elevat per treure l'efecte "paret" dels grafics
@@ -239,45 +251,51 @@ int main(int argc, char *argv[]){
 	std::cout << "Enviat tamany d'eix X: " << widthDepth << " elements\n";
 	std::cout << "Enviat tamany d'eix Y: " << heightDepth << " elements\n";
 
-	//Creem pools de threads i preparem els seus parametres
-	threadArgs threadArgs1, threadArgs2, threadArgs3;
-	pthread_t thread1, thread2, thread3;
+	//THREAD SETUP AND CREATION, ONLY USED IF WE USE MEDIAN FILTERING
+	if(WINDOW_SIZE != 1){
+		//Creem pool de threads i preparem els seus parametres
+		threadArgs threadArgs1, threadArgs2, threadArgs3;
+		pthread_t thread1, thread2, thread3;
 
-	//TODO: calculate thread parameters to pass and update threadArgs1,2,3 
-	//Cada thread processa una tercera part de la matriu (restem el offset de cada costat)
-	int heightChunkSize = (heightDepth - (WINDOW_SIDE_HALF*2))/3;
-	int heightChunkRemainder = (heightDepth - (WINDOW_SIDE_HALF*2))%3;
+		//Cada thread processa una tercera part de la matriu (restem el offset de cada costat)
+		int heightChunkSize = (heightDepth - (WINDOW_SIDE_HALF*2))/3;
+		int heightChunkRemainder = (heightDepth - (WINDOW_SIDE_HALF*2))%3;
 
-	//Si la matriu no es divisible entre 3, ajustem carrega de cada thread
-	if(heightChunkRemainder == 1){
-		threadArgs1.firstRow = WINDOW_SIDE_HALF;
-		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
-		threadArgs2.firstRow = threadArgs1.lastRow + 1;
-		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
-		threadArgs3.firstRow = threadArgs2.lastRow + 1;
-		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
-	} else if(heightChunkRemainder == 2){
-		threadArgs1.firstRow = WINDOW_SIDE_HALF;
-		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
-		threadArgs2.firstRow = threadArgs1.lastRow + 1;
-		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize + 1;	
-		threadArgs3.firstRow = threadArgs2.lastRow + 1;
-		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
-	} else{
-		threadArgs1.firstRow = WINDOW_SIDE_HALF;
-		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize;	
-		threadArgs2.firstRow = threadArgs1.lastRow + 1;
-		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
-		threadArgs3.firstRow = threadArgs2.lastRow + 1;
-		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+		//Si la matriu no es divisible entre 3, ajustem carrega de cada thread
+		if(heightChunkRemainder == 1){
+			threadArgs1.firstRow = WINDOW_SIDE_HALF;
+			threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
+			threadArgs2.firstRow = threadArgs1.lastRow + 1;
+			threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
+			threadArgs3.firstRow = threadArgs2.lastRow + 1;
+			threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+		} else if(heightChunkRemainder == 2){
+			threadArgs1.firstRow = WINDOW_SIDE_HALF;
+			threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
+			threadArgs2.firstRow = threadArgs1.lastRow + 1;
+			threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize + 1;	
+			threadArgs3.firstRow = threadArgs2.lastRow + 1;
+			threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+		} else{
+			threadArgs1.firstRow = WINDOW_SIDE_HALF;
+			threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize;	
+			threadArgs2.firstRow = threadArgs1.lastRow + 1;
+			threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
+			threadArgs3.firstRow = threadArgs2.lastRow + 1;
+			threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+		}
+
+		//L'amplada de la matriu es la mateixa per a tots els threads
+		threadArgs1.matrixWidth = threadArgs2.matrixWidth = threadArgs3.matrixWidth = widthDepth;
+
+		threadArgs1.threadID = 1;
+		threadArgs2.threadID = 2;
+		threadArgs3.threadID = 3;
+
+		pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
+		pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
+		pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
 	}
-
-	//L'amplada de la matriu es la mateixa per a tots els threads
-	threadArgs1.matrixWidth = threadArgs2.matrixWidth = threadArgs3.matrixWidth = widthDepth;
-
-	pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
-	pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
-	pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
 
 	//Comencem loop
 	int counter = 0;
@@ -315,16 +333,18 @@ int main(int argc, char *argv[]){
 		imageData = (uint8_t*)frameImage.getData();
 
 		//**************************** TASK 2 - DEPTH FRAME FILTERING *************************//
-				
-		//Fem cropping en l'eix Z si s'ha especificat als arguments del programa
-		//if(argc >= 3){
-		//	cropAxisZ(depthData, atoi(argv[1]), atoi(argv[2]), heightDepth, widthDepth);
-		//}
 		
 		//Filtratge via mediana de finestra. Nomes aplica si el tamany de finestra no es trivial. 
 		if(WINDOW_SIZE != 1){
 			std::cout << "Iniciant filtratge per mediana amb tamany de finestra: " << WINDOW_SIDE << "x" << WINDOW_SIDE << "\n\n";
-			//TODO: afegeix logica de sincronitzacio de threads
+
+			//Posem els flags d'inici de processat per a cada thread
+			thread1Start = 1;
+			thread2Start = 1;
+			thread3Start = 1;
+
+			//Esperem a que acabin
+			while(!thread1Start || !thread2Start || !thread3Start){}
 		}
 
 		//******************************* TASK 3 - COMPRESSING ********************************//
