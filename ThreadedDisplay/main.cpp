@@ -67,6 +67,23 @@ struct threadArgs {
 };
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//-------------------AUXILIARY AND HELPER FUNCTIONS-------------------//
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
+//Function to sort a given window (array). Used for median filtering.
+void insertSort(uint16_t window[]){
+	uint16_t aux;
+	int i, j;
+	for(i = 0; i < WINDOW_SIZE; ++i){
+		aux = window[i];
+		for(j = i -1; j >= 0 && aux < window[j]; --j){
+			window[j+1] = window[j];
+		}
+		window[j+1] = aux;
+	}
+}
+
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //-----------------------WORKER THREADS FUNCTION----------------------//
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //Function to do a median windowed filtering of a subset of data (matrix).
@@ -102,6 +119,8 @@ void *medianFilterWorker(void *threadData){
 
 	//El thread sempre esta a la espera de que es notifiqui que pot començar
 	while(*threadStart){
+		//DEBUG
+		std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " processing\n\n";
 		for(int i = firstRow; i <= lastRow; ++i){
 		       for(int j = WINDOW_SIDE_HALF; j < matrixWidth - WINDOW_SIDE_HALF; ++j){
 			       //Update dels elements de la finestra
@@ -116,22 +135,6 @@ void *medianFilterWorker(void *threadData){
 		}
 		//Notifiquem que hem acabat, evitem tornar a entrar al bucle
 		*threadStart = 0;
-	}
-}
-
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
-//-------------------AUXILIARY AND HELPER FUNCTIONS-------------------//
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
-//Function to sort a given window (array). Used for median filtering.
-void insertSort(uint16_t window[]){
-	uint16_t aux;
-	int i, j;
-	for(i = 0; i < WINDOW_SIZE; ++i){
-		aux = window[i];
-		for(j = i -1; j >= 0 && aux < window[j]; --j){
-			window[j+1] = window[j];
-		}
-		window[j+1] = aux;
 	}
 }
 
@@ -342,9 +345,15 @@ int main(int argc, char *argv[]){
 			thread1Start = 1;
 			thread2Start = 1;
 			thread3Start = 1;
+			
+			//DEBUG
+			std::cout << "FLAG STATES BEFORE BARRIER: " << thread1Start << thread2Start << thread3Start << "\n";
 
 			//Esperem a que acabin
-			while(!thread1Start || !thread2Start || !thread3Start){}
+			while(thread1Start || thread2Start || thread3Start);
+
+			std::cout << "FLAG STATES AFTER BARRIER: " << thread1Start << thread2Start << thread3Start << "\n";
+			std::cout << "Tots els threads han acabat, procedim\n\n";
 		}
 
 		//******************************* TASK 3 - COMPRESSING ********************************//
