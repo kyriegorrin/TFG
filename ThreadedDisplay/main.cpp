@@ -117,8 +117,12 @@ void *medianFilterWorker(void *threadData){
 			threadStart = &thread1Start;
 	}
 
+	//DEBUG
+	std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " created, flag memory direction: " << threadStart  << "\n\n";
+
 	//El thread sempre esta a la espera de que es notifiqui que pot començar
-	while(*threadStart){
+	while(1){
+		while(!*threadStart);
 		//DEBUG
 		std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " processing\n\n";
 		for(int i = firstRow; i <= lastRow; ++i){
@@ -295,6 +299,11 @@ int main(int argc, char *argv[]){
 		threadArgs2.threadID = 2;
 		threadArgs3.threadID = 3;
 
+		std::cout << "Creant threads, direccions dels flags de cada thread: \n";
+		std::cout << &thread1Start << "\n";
+		std::cout << &thread2Start << "\n";
+		std::cout << &thread3Start << "\n\n";
+		
 		pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
 		pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
 		pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
