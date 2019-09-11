@@ -28,7 +28,7 @@ using namespace openni;
 #define SOCK_BUFF_SIZE 1000
 
 //Tamany de la finestra per a filtratge (e.g. 3x3 = 9, 5x5 = 25, 7x7 = 49, etc)
-#define WINDOW_SIZE 25
+#define WINDOW_SIZE 49
 #define WINDOW_SIDE (int)sqrt((double)WINDOW_SIZE)
 #define WINDOW_SIDE_HALF WINDOW_SIDE/2 //Util per a offsets
 #define WALL_OFFSET (uint16_t) 5000 //Offset inicial de les "parets" de la matriu secundaria
