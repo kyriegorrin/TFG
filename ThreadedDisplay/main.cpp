@@ -64,6 +64,8 @@ struct threadArgs {
 	int firstRow;
 	int lastRow;
 	int matrixWidth;
+	uint16_t *inputData;
+	uint16_t *outputData;
 };
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
@@ -90,8 +92,8 @@ void insertSort(uint16_t window[]){
 //threadData contains the width of the matrix and the initial and end row to process.
 void *medianFilterWorker(void *threadData){
 	//Global variables to use, defined at main
-	uint16_t *depthData;
-	uint16_t *filteredDepthData;
+	uint16_t *depthData = ((threadArgs*)threadData)->inputData;
+	uint16_t *filteredDepthData = ((threadArgs*)threadData)->outputData;
 
 	int firstRow = ((threadArgs*)threadData)->firstRow;
 	int lastRow = ((threadArgs*)threadData)->lastRow;
@@ -298,6 +300,9 @@ int main(int argc, char *argv[]){
 		threadArgs1.threadID = 1;
 		threadArgs2.threadID = 2;
 		threadArgs3.threadID = 3;
+
+		threadArgs1.inputData = threadArgs2.inputData = threadArgs3.inputData = depthData;
+		threadArgs1.outputData = threadArgs2.outputData = threadArgs3.outputData = &filteredDepthData[0][0];
 
 		std::cout << "Creant threads, direccions dels flags de cada thread: \n";
 		std::cout << &thread1Start << "\n";
