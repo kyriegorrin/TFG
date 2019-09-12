@@ -53,11 +53,6 @@ static HEAP_ALLOC(wrkmem, LZO1X_1_MEM_COMPRESS);
 
 
 //MULTITHREAD STRUCTURES AND VARIABLES//
-//Flags a utilitzar per a sincronitzar threads
-int thread1Start = 0;
-int thread2Start = 0;
-int thread3Start = 0;
-
 //Estructura de dades a utilitzar com a parametre per als threads
 struct threadArgs {
 	int threadID;
@@ -100,46 +95,22 @@ void *medianFilterWorker(void *threadData){
 	uint16_t median;
 	uint16_t window[WINDOW_SIZE];
 
-	//Depenent del thread on som, mirem un flag o un altre
-	int *threadStart;
-	switch(((threadArgs*)threadData)->threadID){
-		case 1:
-			threadStart = &thread1Start;
-			break;
-		case 2:
-			threadStart = &thread2Start;
-			break;
-		case 3:
-			threadStart = &thread3Start;
-			break;
-		//No hauria de passar
-		default:
-			threadStart = &thread1Start;
-	}
-
 	//DEBUG
-	std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " created, flag memory direction: " << threadStart  << "\n\n";
-
-	//El thread sempre esta a la espera de que es notifiqui que pot començar
-	while(1){
-		while(!*threadStart);
-		//DEBUG
-		std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " processing\n\n";
-		for(int i = firstRow; i <= lastRow; ++i){
-		       for(int j = WINDOW_SIDE_HALF; j < matrixWidth - WINDOW_SIDE_HALF; ++j){
-			       //Update dels elements de la finestra
-			       for(int k = 0; k < WINDOW_SIZE; ++k){
-						   window[k] = *(depthData + (matrixWidth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
-			       } 
-			 	//Sort dels valors de la finestra i seleccio de mediana
-			       insertSort(window);
-			       median = window[WINDOW_SIZE / 2];
-			       *(filteredDepthData + j + (i * matrixWidth)) = median;
-		       }
-		}
-		//Notifiquem que hem acabat, evitem tornar a entrar al bucle
-		*threadStart = 0;
+	std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " processing\n\n";
+	for(int i = firstRow; i <= lastRow; ++i){
+	       for(int j = WINDOW_SIDE_HALF; j < matrixWidth - WINDOW_SIDE_HALF; ++j){
+		       //Update dels elements de la finestra
+		       for(int k = 0; k < WINDOW_SIZE; ++k){
+					   window[k] = *(depthData + (matrixWidth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
+		       } 
+		 	//Sort dels valors de la finestra i seleccio de mediana
+		       insertSort(window);
+		       median = window[WINDOW_SIZE / 2];
+		       *(filteredDepthData + j + (i * matrixWidth)) = median;
+	       }
 	}
+	//Matem el thread
+	pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]){
@@ -258,58 +229,50 @@ int main(int argc, char *argv[]){
 	std::cout << "Enviat tamany d'eix X: " << widthDepth << " elements\n";
 	std::cout << "Enviat tamany d'eix Y: " << heightDepth << " elements\n";
 
-	//THREAD SETUP AND CREATION, ONLY USED IF WE USE MEDIAN FILTERING
-	if(WINDOW_SIZE != 1){
-		//Creem pool de threads i preparem els seus parametres
-		threadArgs threadArgs1, threadArgs2, threadArgs3;
-		pthread_t thread1, thread2, thread3;
 
-		//Cada thread processa una tercera part de la matriu (restem el offset de cada costat)
-		int heightChunkSize = (heightDepth - (WINDOW_SIDE_HALF*2))/3;
-		int heightChunkRemainder = (heightDepth - (WINDOW_SIDE_HALF*2))%3;
 
-		//Si la matriu no es divisible entre 3, ajustem carrega de cada thread
-		if(heightChunkRemainder == 1){
-			threadArgs1.firstRow = WINDOW_SIDE_HALF;
-			threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
-			threadArgs2.firstRow = threadArgs1.lastRow + 1;
-			threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
-			threadArgs3.firstRow = threadArgs2.lastRow + 1;
-			threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
-		} else if(heightChunkRemainder == 2){
-			threadArgs1.firstRow = WINDOW_SIDE_HALF;
-			threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
-			threadArgs2.firstRow = threadArgs1.lastRow + 1;
-			threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize + 1;	
-			threadArgs3.firstRow = threadArgs2.lastRow + 1;
-			threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
-		} else{
-			threadArgs1.firstRow = WINDOW_SIDE_HALF;
-			threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize;	
-			threadArgs2.firstRow = threadArgs1.lastRow + 1;
-			threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
-			threadArgs3.firstRow = threadArgs2.lastRow + 1;
-			threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
-		}
+	//THREAD STRUCTURES SETUP 
+	//Creem estructures dels threads i preparem els seus parametres
+	threadArgs threadArgs1, threadArgs2, threadArgs3;
+	pthread_t thread1, thread2, thread3;
 
-		//L'amplada de la matriu es la mateixa per a tots els threads
-		threadArgs1.matrixWidth = threadArgs2.matrixWidth = threadArgs3.matrixWidth = widthDepth;
+	//Cada thread processa una tercera part de la matriu (restem el offset de cada costat)
+	int heightChunkSize = (heightDepth - (WINDOW_SIDE_HALF*2))/3;
+	int heightChunkRemainder = (heightDepth - (WINDOW_SIDE_HALF*2))%3;
 
-		threadArgs1.threadID = 1;
-		threadArgs2.threadID = 2;
-		threadArgs3.threadID = 3;
-
-		std::cout << "Creant threads, direccions dels flags de cada thread: \n";
-		std::cout << &thread1Start << "\n";
-		std::cout << &thread2Start << "\n";
-		std::cout << &thread3Start << "\n\n";
-		
-		pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
-		pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
-		pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
+	//Si la matriu no es divisible entre 3, ajustem carrega de cada thread
+	if(heightChunkRemainder == 1){
+		threadArgs1.firstRow = WINDOW_SIDE_HALF;
+		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
+		threadArgs2.firstRow = threadArgs1.lastRow + 1;
+		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
+		threadArgs3.firstRow = threadArgs2.lastRow + 1;
+		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+	} else if(heightChunkRemainder == 2){
+		threadArgs1.firstRow = WINDOW_SIDE_HALF;
+		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize + 1;	
+		threadArgs2.firstRow = threadArgs1.lastRow + 1;
+		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize + 1;	
+		threadArgs3.firstRow = threadArgs2.lastRow + 1;
+		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
+	} else{
+		threadArgs1.firstRow = WINDOW_SIDE_HALF;
+		threadArgs1.lastRow = WINDOW_SIDE_HALF + heightChunkSize;	
+		threadArgs2.firstRow = threadArgs1.lastRow + 1;
+		threadArgs2.lastRow = threadArgs2.firstRow + heightChunkSize;	
+		threadArgs3.firstRow = threadArgs2.lastRow + 1;
+		threadArgs3.lastRow = threadArgs3.firstRow + heightChunkSize;	
 	}
 
-	//Comencem loop
+	//L'amplada de la matriu es la mateixa per a tots els threads
+	threadArgs1.matrixWidth = threadArgs2.matrixWidth = threadArgs3.matrixWidth = widthDepth;
+
+	threadArgs1.threadID = 1;
+	threadArgs2.threadID = 2;
+	threadArgs3.threadID = 3;
+
+
+	//MAIN PROGRAM LOOP
 	int counter = 0;
 	while(counter != 3000){
 		//......................TASK 1 - FRAME PROCESSING...................//
@@ -349,19 +312,17 @@ int main(int argc, char *argv[]){
 		//Filtratge via mediana de finestra. Nomes aplica si el tamany de finestra no es trivial. 
 		if(WINDOW_SIZE != 1){
 			std::cout << "Iniciant filtratge per mediana amb tamany de finestra: " << WINDOW_SIDE << "x" << WINDOW_SIDE << "\n\n";
-
-			//Posem els flags d'inici de processat per a cada thread
-			thread1Start = 1;
-			thread2Start = 1;
-			thread3Start = 1;
+			std::cout << "Creant threads per a filtering \n\n";
+		
+			pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
+			pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
+			pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
 			
-			//DEBUG
-			std::cout << "FLAG STATES BEFORE BARRIER: " << thread1Start << thread2Start << thread3Start << "\n";
-
 			//Esperem a que acabin
-			while(thread1Start || thread2Start || thread3Start);
+			pthread_join(thread1, NULL);
+			pthread_join(thread2, NULL);
+			pthread_join(thread3, NULL);
 
-			std::cout << "FLAG STATES AFTER BARRIER: " << thread1Start << thread2Start << thread3Start << "\n";
 			std::cout << "Tots els threads han acabat, procedim\n\n";
 		}
 
