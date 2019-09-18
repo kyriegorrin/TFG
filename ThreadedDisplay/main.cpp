@@ -54,9 +54,9 @@ static HEAP_ALLOC(wrkmem, LZO1X_1_MEM_COMPRESS);
 
 //MULTITHREAD STRUCTURES AND VARIABLES//
 //Flags a utilitzar per a sincronitzar threads
-int thread1Start = 0;
-int thread2Start = 0;
-int thread3Start = 0;
+volatile int thread1Start = 0;
+volatile int thread2Start = 0;
+volatile int thread3Start = 0;
 
 //Estructura de dades a utilitzar com a parametre per als threads
 struct threadArgs {
@@ -103,7 +103,7 @@ void *medianFilterWorker(void *threadData){
 	uint16_t window[WINDOW_SIZE];
 
 	//Depenent del thread on som, mirem un flag o un altre
-	int *threadStart;
+	volatile int *threadStart;
 	switch(((threadArgs*)threadData)->threadID){
 		case 1:
 			threadStart = &thread1Start;
@@ -137,6 +137,7 @@ void *medianFilterWorker(void *threadData){
 			       insertSort(window);
 			       median = window[WINDOW_SIZE / 2];
 			       *(filteredDepthData + j + (i * matrixWidth)) = median;
+				std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " treated position " << i << " " << j << "\n\n";
 		       }
 		}
 		//Notifiquem que hem acabat, evitem tornar a entrar al bucle
@@ -310,8 +311,8 @@ int main(int argc, char *argv[]){
 		std::cout << &thread3Start << "\n\n";
 		
 		pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
-		pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
-		pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
+		//pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
+		//pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
 	}
 
 	//Comencem loop
@@ -364,7 +365,8 @@ int main(int argc, char *argv[]){
 			std::cout << "FLAG STATES BEFORE BARRIER: " << thread1Start << thread2Start << thread3Start << "\n";
 
 			//Esperem a que acabin
-			while(thread1Start || thread2Start || thread3Start);
+			//while(thread1Start || thread2Start || thread3Start);
+			while(thread1Start);
 
 			std::cout << "FLAG STATES AFTER BARRIER: " << thread1Start << thread2Start << thread3Start << "\n";
 			std::cout << "Tots els threads han acabat, procedim\n\n";
