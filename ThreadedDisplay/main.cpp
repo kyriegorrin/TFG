@@ -29,6 +29,10 @@ using namespace openni;
 //Tamany del buffer a utilitzar per al socket
 #define SOCK_BUFF_SIZE 1000
 
+//DATA POINTERS TO CAMERA DATA
+uint16_t* depthData;
+uint8_t* imageData;
+
 
 //FILTERING VARIABLES
 //Tamany de la finestra per a filtratge (e.g. 3x3 = 9, 5x5 = 25, 7x7 = 49, etc)
@@ -53,20 +57,23 @@ static HEAP_ALLOC(wrkmem, LZO1X_1_MEM_COMPRESS);
 
 
 //MULTITHREAD STRUCTURES AND VARIABLES//
-//Flags a utilitzar per a sincronitzar threads
-volatile int thread1Start = 0;
-volatile int thread2Start = 0;
-volatile int thread3Start = 0;
-
 //Estructura de dades a utilitzar com a parametre per als threads
 struct threadArgs {
 	int threadID;
 	int firstRow;
 	int lastRow;
 	int matrixWidth;
-	uint16_t *inputData;
 	uint16_t *outputData;
 };
+
+//Flags a utilitzar per a sincronitzar threads
+volatile int thread1Start = 0;
+volatile int thread2Start = 0;
+volatile int thread3Start = 0;
+		
+//Declaració de threads i estructures
+threadArgs threadArgs1, threadArgs2, threadArgs3;
+pthread_t thread1, thread2, thread3;
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++//
 //-------------------AUXILIARY AND HELPER FUNCTIONS-------------------//
@@ -92,7 +99,6 @@ void insertSort(uint16_t window[]){
 //threadData contains the width of the matrix and the initial and end row to process.
 void *medianFilterWorker(void *threadData){
 	//Global variables to use, defined at main
-	uint16_t *depthData = ((threadArgs*)threadData)->inputData;
 	uint16_t *filteredDepthData = ((threadArgs*)threadData)->outputData;
 
 	int firstRow = ((threadArgs*)threadData)->firstRow;
@@ -126,18 +132,19 @@ void *medianFilterWorker(void *threadData){
 	while(1){
 		while(!*threadStart);
 		//DEBUG
-		std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " processing\n\n";
+		//std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " processing, starting at [" << firstRow << "," << WINDOW_SIDE_HALF << "]\n\n";
 		for(int i = firstRow; i <= lastRow; ++i){
 		       for(int j = WINDOW_SIDE_HALF; j < matrixWidth - WINDOW_SIDE_HALF; ++j){
 			       //Update dels elements de la finestra
 			       for(int k = 0; k < WINDOW_SIZE; ++k){
+						//std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " processing [" << i << "," << j << "], window[" << k << "]\n";
 						   window[k] = *(depthData + (matrixWidth * (i + ((k / WINDOW_SIDE) - WINDOW_SIDE_HALF)) + (j + (k % WINDOW_SIDE) - WINDOW_SIDE_HALF)));
 			       } 
 			 	//Sort dels valors de la finestra i seleccio de mediana
 			       insertSort(window);
 			       median = window[WINDOW_SIZE / 2];
 			       *(filteredDepthData + j + (i * matrixWidth)) = median;
-				std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " treated position " << i << " " << j << "\n\n";
+				//std::cout << "Thread " << ((threadArgs*)threadData)->threadID << " treated position " << i << " " << j << "\n\n";
 		       }
 		}
 		//Notifiquem que hem acabat, evitem tornar a entrar al bucle
@@ -231,8 +238,6 @@ int main(int argc, char *argv[]){
 	int heightImage, widthImage, sizeInBytesImage, strideImage;
 	
 	lzo_uint inLength, lzoOutLength;
-	uint16_t* depthData;
-	uint8_t* imageData;
 
 	int lzo_status;
 
@@ -263,10 +268,6 @@ int main(int argc, char *argv[]){
 
 	//THREAD SETUP AND CREATION, ONLY USED IF WE USE MEDIAN FILTERING
 	if(WINDOW_SIZE != 1){
-		//Creem pool de threads i preparem els seus parametres
-		threadArgs threadArgs1, threadArgs2, threadArgs3;
-		pthread_t thread1, thread2, thread3;
-
 		//Cada thread processa una tercera part de la matriu (restem el offset de cada costat)
 		int heightChunkSize = (heightDepth - (WINDOW_SIDE_HALF*2))/3;
 		int heightChunkRemainder = (heightDepth - (WINDOW_SIDE_HALF*2))%3;
@@ -302,7 +303,6 @@ int main(int argc, char *argv[]){
 		threadArgs2.threadID = 2;
 		threadArgs3.threadID = 3;
 
-		threadArgs1.inputData = threadArgs2.inputData = threadArgs3.inputData = depthData;
 		threadArgs1.outputData = threadArgs2.outputData = threadArgs3.outputData = &filteredDepthData[0][0];
 
 		std::cout << "Creant threads, direccions dels flags de cada thread: \n";
@@ -311,8 +311,8 @@ int main(int argc, char *argv[]){
 		std::cout << &thread3Start << "\n\n";
 		
 		pthread_create(&thread1, NULL, medianFilterWorker, (void*)&threadArgs1);
-		//pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
-		//pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
+		pthread_create(&thread2, NULL, medianFilterWorker, (void*)&threadArgs2);
+		pthread_create(&thread3, NULL, medianFilterWorker, (void*)&threadArgs3);
 	}
 
 	//Comencem loop
@@ -365,8 +365,7 @@ int main(int argc, char *argv[]){
 			std::cout << "FLAG STATES BEFORE BARRIER: " << thread1Start << thread2Start << thread3Start << "\n";
 
 			//Esperem a que acabin
-			//while(thread1Start || thread2Start || thread3Start);
-			while(thread1Start);
+			while(thread1Start || thread2Start || thread3Start);
 
 			std::cout << "FLAG STATES AFTER BARRIER: " << thread1Start << thread2Start << thread3Start << "\n";
 			std::cout << "Tots els threads han acabat, procedim\n\n";
